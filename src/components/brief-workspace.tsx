@@ -21,6 +21,7 @@ const viewedKey = "terracdm:brief:viewed";
 export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap }: Props) {
   const [artifact, setArtifact] = useState<OverviewArtifact | null>(null);
   const [history, setHistory] = useState<OverviewArtifact[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [scope, setScope] = useState<BriefScope>(defaultBriefScope);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -41,14 +42,18 @@ export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap
     if (!response.ok) throw new Error(payload.error ?? "Brief history could not be read");
     const next = payload.artifacts ?? [];
     setHistory(next);
+    setHistoryLoaded(true);
     return next;
   };
 
   useEffect(() => {
     let active = true;
-    void readHistory().then((items) => {
+    void fetch("/api/overview", { cache: "no-store" }).then(async (response) => {
+      const payload = await response.json() as { artifact?: OverviewArtifact; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Brief could not be read");
+      return payload.artifact ?? null;
+    }).then((latest) => {
       if (!active) return;
-      const latest = items[0] ?? null;
       setArtifact(latest);
       setScope(latest?.scope ?? defaultBriefScope);
       setDraftSummary(latest?.overview ?? "");
@@ -116,9 +121,18 @@ export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap
     onNavigate(lens);
   };
 
+  const toggleHistory = () => {
+    if (historyOpen) {
+      setHistoryOpen(false);
+      return;
+    }
+    setHistoryOpen(true);
+    if (!historyLoaded) void readHistory().catch((cause) => setError(cause instanceof Error ? cause.message : "Brief history could not be read"));
+  };
+
   return <section className="workspace-foundation workspace-brief" aria-labelledby="brief-title">
     <header className="workspace-foundation-head brief-head"><div><h1 id="brief-title">Brief</h1>{artifact && <span>{new Date(artifact.createdAt).toLocaleString()}</span>}{stale && <i>Update available</i>}</div><div className="brief-head-actions">
-      <button type="button" onClick={() => setHistoryOpen((value) => !value)} aria-expanded={historyOpen}><ClockCounterClockwise size={16} />History</button>
+      <button type="button" onClick={toggleHistory} aria-expanded={historyOpen}><ClockCounterClockwise size={16} />History</button>
       <button type="button" onClick={() => { setDraftSummary(artifact?.overview ?? ""); setEditing(true); }} disabled={!artifact}><PencilSimple size={16} />Edit</button>
       <button type="button" onClick={() => void shareBrief()} disabled={!artifact}><ShareNetwork size={16} />Share</button>
       <button type="button" onClick={exportBrief} disabled={!artifact}><DownloadSimple size={16} />Export</button>

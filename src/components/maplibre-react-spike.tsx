@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { Anchor, X } from "@phosphor-icons/react";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/maplibre";
 import type { CustomLayerInterface, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
@@ -12,12 +13,10 @@ import { IncomingSignalQueue } from "@/src/components/incoming-signal-queue";
 import { MapHud, useMapLocation } from "@/src/components/map-hud";
 import { defaultMapSettings, normalizeMapSettings, type MapSettings } from "@/src/lib/map-settings";
 import { ActionDeck } from "@/src/components/action-deck";
-import { AgentSheet } from "@/src/components/agent-sheet";
 import { DeterministicActionSheet } from "@/src/components/deterministic-action-sheet";
 import type { DeterministicAction } from "@/src/lib/deterministic-actions";
 import { getFeedStatus, type FeedStatus } from "@/src/lib/feed-status";
 import { MapNodeSheet } from "@/src/components/map-node-sheet";
-import { NodeGraphSheet } from "@/src/components/node-graph-sheet";
 import { geosearchZoom, type GeosearchResult } from "@/src/lib/geosearch";
 import type { ChatReference } from "@/src/lib/server/chat";
 import { setSignalQueueOpen } from "@/src/lib/signal-queue-store";
@@ -25,6 +24,9 @@ import { getCatalog } from "@/src/lib/catalog/registry";
 import { observationsToEntities, observationsToSignals } from "@/src/lib/catalog/observations";
 import { isFireDomainId } from "@/src/lib/catalog/domains";
 import type { ProviderRequest, ProviderViewport } from "@/src/lib/catalog/types";
+
+const AgentSheet = dynamic(() => import("@/src/components/agent-sheet").then((module) => module.AgentSheet), { ssr: false });
+const NodeGraphSheet = dynamic(() => import("@/src/components/node-graph-sheet").then((module) => module.NodeGraphSheet), { ssr: false });
 
 type DirectionalRenderNode = {
   id: string;

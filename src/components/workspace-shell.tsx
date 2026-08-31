@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ElementType, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import dynamic from "next/dynamic";
 import {
   Article,
   Bell,
@@ -25,7 +26,6 @@ import {
 } from "@phosphor-icons/react";
 import { MaplibreReactSpike, type WorkspaceMapSettingsRequest, type WorkspaceMapSettingsState, type WorkspaceSearchCorpus, type WorkspaceSearchSelection, type WorkspaceToolRequest, type WorkspaceToolState } from "@/src/components/maplibre-react-spike";
 import { SignalIcon } from "@/src/components/incoming-signal-queue";
-import { BriefWorkspace } from "@/src/components/brief-workspace";
 import type { BriefDevelopment } from "@/src/lib/brief";
 import type { ChatReference } from "@/src/lib/server/chat";
 import type { FeedStatus } from "@/src/lib/feed-status";
@@ -33,6 +33,8 @@ import { geosearchKindLabel, type GeosearchResult } from "@/src/lib/geosearch";
 import type { Entity, Signal } from "@/src/lib/intelligence";
 import { defaultMapSettings, timeZoneOptions, type MapSettings, type MapTimeZone, type TimeFormat } from "@/src/lib/map-settings";
 import { defaultWorkspaceShellState, readWorkspaceLocation, workspaceLenses, workspaceShellReducer, writeWorkspaceLocation, type InspectorRef, type WorkspaceLens } from "@/src/lib/workspace-shell-state";
+
+const BriefWorkspace = dynamic(() => import("@/src/components/brief-workspace").then((module) => module.BriefWorkspace), { ssr: false });
 
 type WorkspaceMode = WorkspaceLens;
 
