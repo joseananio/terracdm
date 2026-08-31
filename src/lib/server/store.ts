@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CanonicalProviderSnapshot } from "../intelligence";
+import { CanonicalProviderSnapshot, type Observation } from "../intelligence";
 import { ingestObservations } from "./observation-repository";
 
 type Watchlist = { id: string; name: string; entityIds: string[]; createdAt: string; storage: "supabase" | "memory" };
@@ -8,6 +8,7 @@ type AgentRun = { id: string; prompt: string; intent: string; summary: string; s
 
 const memoryWatchlists = new Map<string, Watchlist>();
 const memoryRuns = new Map<string, AgentRun>();
+const OBSERVATION_BATCH_SIZE = 500;
 
 function supabaseServer(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -43,8 +44,62 @@ export async function saveWatchlist(name: string, entityIds: string[]) {
 
 export async function listAgentRuns() { return [...memoryRuns.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 
+function observationSearchText(observation: Observation) {
+  return [
+    observation.name,
+    observation.description,
+    observation.location?.label,
+    observation.domain,
+    observation.subdomainId,
+    observation.source.id,
+    observation.source.name,
+    observation.providerId,
+    JSON.stringify(observation.properties ?? {}),
+  ].filter(Boolean).join(" ");
+}
+
+function observationRow(observation: Observation) {
+  const coordinates = observation.location?.coordinates;
+  return {
+    observation_id: observation.id,
+    kind: observation.kind,
+    domain: observation.domain.toLowerCase(),
+    subdomain_id: observation.subdomainId,
+    source_id: observation.source.id.toLowerCase(),
+    source_name: observation.source.name,
+    provider_id: observation.providerId,
+    pack_id: observation.packId ?? null,
+    signal_type: observation.signalType ?? null,
+    name: observation.name,
+    description: observation.description,
+    risk: observation.risk,
+    risk_score: observation.riskScore,
+    observed_at: observation.observedAt,
+    location_label: observation.location?.label ?? null,
+    location: coordinates ? `POINT(${coordinates.lng} ${coordinates.lat})` : null,
+    search_text: observationSearchText(observation),
+    payload: observation,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function upsertObservationRows(client: SupabaseClient, observations: Observation[]) {
+  const latest = new Map<string, Observation>();
+  for (const observation of observations) {
+    const current = latest.get(observation.id);
+    if (!current || observation.observedAt > current.observedAt) latest.set(observation.id, observation);
+  }
+  const rows = [...latest.values()].map(observationRow);
+  for (let start = 0; start < rows.length; start += OBSERVATION_BATCH_SIZE) {
+    const { error } = await client.from("intelligence_observations").upsert(rows.slice(start, start + OBSERVATION_BATCH_SIZE), { onConflict: "observation_id" });
+    if (error) return error;
+  }
+  return null;
+}
+
 export async function persistIntelligence(snapshots: CanonicalProviderSnapshot[]) {
-  ingestObservations(snapshots.flatMap((snapshot) => snapshot.observations));
+  const observations = snapshots.flatMap((snapshot) => snapshot.observations);
+  ingestObservations(observations);
   const client = supabaseServer();
   if (!client) return { storage: "memory" as const, persisted: false };
   const snapshotRows = snapshots.map((item) => {
@@ -59,6 +114,8 @@ export async function persistIntelligence(snapshots: CanonicalProviderSnapshot[]
     const eventResult = await client.from("intelligence_events").upsert(eventRows, { onConflict: "event_id" });
     if (eventResult.error) return { storage: "supabase" as const, persisted: true, error: eventResult.error.message };
   }
+  const observationError = await upsertObservationRows(client, observations);
+  if (observationError) return { storage: "supabase" as const, persisted: true, error: observationError.message };
   try {
     const channel = client.channel("terracdm-intelligence");
     const result = await channel.httpSend("source-update", { fetchedAt: new Date().toISOString(), domains: snapshots.map((item) => item.domain) });
