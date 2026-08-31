@@ -1,0 +1,13 @@
+<rss version="2.0">
+  <channel>
+    <title>Verification feed</title>
+    <item>
+      <guid>rss-1</guid>
+      <title>RSS signal</title>
+      <description>RSS fixture description</description>
+      <link>https://fixtures.example/rss-1</link>
+      <pubDate>2026-08-23T12:00:00.000Z</pubDate>
+      <location>London</location>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,103 @@
+{
+  "domain": "verification",
+  "version": "1.0.0",
+  "label": "Verification fixtures",
+  "subdomains": [
+    { "id": "http-json", "label": "HTTP JSON" },
+    { "id": "geojson", "label": "GeoJSON" },
+    { "id": "rss", "label": "RSS" },
+    { "id": "csv", "label": "CSV" }
+  ],
+  "providers": [
+    {
+      "id": "fixture-http-json",
+      "label": "HTTP JSON fixture",
+      "sourceId": "fixture-http-json",
+      "type": "http-json",
+      "endpoint": "https://fixtures.example/http.json",
+      "mapping": {
+        "itemsPath": "items",
+        "signalType": "verification.http",
+        "entity": {
+          "id": { "path": "id" },
+          "name": { "path": "title" },
+          "description": { "template": "HTTP {{title}}" },
+          "location": { "lat": { "path": "lat" }, "lng": { "path": "lng" }, "label": { "path": "place" } },
+          "riskScore": { "path": "score" },
+          "observedAt": { "path": "observedAt" },
+          "properties": { "format": { "path": "format" } }
+        }
+      }
+    },
+    {
+      "id": "fixture-geojson",
+      "label": "GeoJSON fixture",
+      "sourceId": "fixture-geojson",
+      "type": "geojson",
+      "endpoint": "https://fixtures.example/geo.json",
+      "mapping": {
+        "itemsPath": "features",
+        "signalType": "verification.geojson",
+        "entity": {
+          "id": { "path": "properties.id" },
+          "name": { "path": "properties.name" },
+          "location": { "lat": { "path": "geometry.coordinates[1]" }, "lng": { "path": "geometry.coordinates[0]" }, "label": { "path": "properties.place" } },
+          "riskScore": { "path": "properties.score" },
+          "properties": { "format": { "path": "properties.format" } }
+        }
+      }
+    },
+    {
+      "id": "fixture-rss",
+      "label": "RSS fixture",
+      "sourceId": "fixture-rss",
+      "type": "rss",
+      "endpoint": "https://fixtures.example/feed.xml",
+      "mapping": {
+        "signalType": "verification.rss",
+        "signal": {
+          "id": { "path": "id" },
+          "name": { "path": "title" },
+          "description": { "path": "description" },
+          "location": { "path": "location" },
+          "observedAt": { "path": "pubDate" },
+          "properties": { "format": { "template": "rss" } }
+        }
+      }
+    },
+    {
+      "id": "fixture-csv",
+      "label": "CSV fixture",
+      "sourceId": "fixture-csv",
+      "type": "csv",
+      "endpoint": "https://fixtures.example/data.csv",
+      "mapping": {
+        "signalType": "verification.csv",
+        "entity": {
+          "id": { "path": "code" },
+          "name": { "path": "name" },
+          "location": { "lat": { "path": "latitude" }, "lng": { "path": "longitude" }, "label": { "path": "place" } },
+          "riskScore": { "path": "score" },
+          "properties": { "format": { "path": "format" } }
+        }
+      }
+    }
+  ],
+  "signals": [
+    { "id": "verification.http", "label": "HTTP JSON observation", "providerId": "fixture-http-json", "subdomainId": "http-json" },
+    { "id": "verification.geojson", "label": "GeoJSON observation", "providerId": "fixture-geojson", "subdomainId": "geojson" },
+    { "id": "verification.rss", "label": "RSS observation", "providerId": "fixture-rss", "subdomainId": "rss" },
+    { "id": "verification.csv", "label": "CSV observation", "providerId": "fixture-csv", "subdomainId": "csv" }
+  ],
+  "presentation": {
+    "map": {
+      "id": "verification",
+      "label": "Verification fixtures",
+      "short": "TEST",
+      "color": "#ffffff",
+      "source": "Fixture providers",
+      "status": "live",
+      "details": [{ "id": "all", "label": "All fixture observations" }]
+    }
+  }
+}

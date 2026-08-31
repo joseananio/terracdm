@@ -1,0 +1,49 @@
+services:
+  terracdm:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
+    image: terracdm:local
+    restart: unless-stopped
+    ports:
+      - "${TERRACDM_PORT:-3003}:3000"
+    environment:
+      TERRACDM_CONFIG: /app/terracdm.yaml
+      WORKFLOW_LOCAL_DATA_DIR: /app/data/workflow
+      CRON_SECRET: ${CRON_SECRET:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      OPENSKY_CLIENT_ID: ${OPENSKY_CLIENT_ID:-}
+      OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
+      FIRMS_API_KEY: ${FIRMS_API_KEY:-}
+      FIRMS_MAP_KEY: ${FIRMS_MAP_KEY:-}
+      WSDOT_ACCESS_CODE: ${WSDOT_ACCESS_CODE:-}
+      NVD_API_KEY: ${NVD_API_KEY:-}
+      ABUSE_CH_AUTH_KEY: ${ABUSE_CH_AUTH_KEY:-}
+      OPENSANCTIONS_API_TOKEN: ${OPENSANCTIONS_API_TOKEN:-}
+      N2YO_API_KEY: ${N2YO_API_KEY:-}
+      TELEGRAM_CHANNELS: ${TELEGRAM_CHANNELS:-sentdefender,osintdefender,OSINTtechnical,warmonitors,UAWeapons}
+      SCANNER_URL: ${SCANNER_URL:-}
+      SCANNER_KEY: ${SCANNER_KEY:-}
+      ACLED_ENABLED: ${ACLED_ENABLED:-false}
+      ACLED_USERNAME: ${ACLED_USERNAME:-}
+      ACLED_PASSWORD: ${ACLED_PASSWORD:-}
+    volumes:
+      - terracdm_data:/app/data
+      - ./terracdm.yaml:/app/terracdm.yaml:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  terracdm_data:

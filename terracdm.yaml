@@ -1,0 +1,25 @@
+# Server-only TerraCDM instance configuration.
+# Keep credentials in environment variables; never put secret values here.
+version: 1
+
+packs:
+  # Use `disabled` to make the entries below an allow-list.
+  defaults: enabled
+  entries: {}
+
+# Example:
+#
+# packs:
+#   defaults: disabled
+#   entries:
+#     aviation:
+#       enabled: true
+#       providers:
+#         aviation-network:
+#           pollSeconds: 120
+#           cache:
+#             maxAgeSeconds: 120
+#             staleIfErrorSeconds: 600
+#     air-quality:
+#       enabled: true
+#       source: ./packs/air-quality.yaml

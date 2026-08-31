@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "http-1",
+      "title": "HTTP station",
+      "place": "Berlin",
+      "lat": 52.52,
+      "lng": 13.405,
+      "score": 70,
+      "format": "http-json",
+      "observedAt": "2026-08-23T12:00:00.000Z"
+    }
+  ]
+}
