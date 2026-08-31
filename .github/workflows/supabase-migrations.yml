@@ -1,0 +1,69 @@
+name: Supabase migrations
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+    paths:
+      - supabase/migrations/**
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Database environment to update
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      dry_run:
+        description: Preview migrations without applying them
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migrations-${{ inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+
+      - name: Apply staging migrations
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.target == 'staging') ||
+          (github.event_name == 'push' && github.ref_name == 'staging')
+        env:
+          SUPABASE_DB_URL: ${{ secrets.STAGING_DB_URL }}
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+          else
+            supabase db push --db-url "$SUPABASE_DB_URL"
+          fi
+
+      - name: Apply production migrations
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.target == 'production') ||
+          (github.event_name == 'push' && github.ref_name == 'main')
+        env:
+          SUPABASE_DB_URL: ${{ secrets.PROD_DB_URL }}
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+          else
+            supabase db push --db-url "$SUPABASE_DB_URL"
+          fi
