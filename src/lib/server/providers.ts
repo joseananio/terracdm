@@ -3,7 +3,6 @@ import type { ProviderRequest } from "../catalog/types";
 import { fetchText } from "./fetch-json";
 import { defaultCatalogLayerIds, getCatalog } from "../catalog/registry";
 import { providerErrorSnapshot, runProvider } from "../catalog/provider-runtime";
-import { ingestObservations } from "./observation-repository";
 
 function textTag(block: string, tag: string) {
   const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
@@ -35,6 +34,5 @@ export async function getSnapshot(requested?: Domain[], request: ProviderRequest
   });
   const snapshots = await Promise.all(jobs);
   const observations = snapshots.flatMap((item) => item.observations);
-  ingestObservations(observations);
   return { snapshots, observations };
 }

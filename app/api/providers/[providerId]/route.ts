@@ -23,13 +23,13 @@ export async function GET(request: NextRequest) {
   const viewport = west !== undefined && south !== undefined && east !== undefined && north !== undefined
     ? { west, south, east, north }
     : undefined;
+  const snapshot = await runProvider(provider, { viewport, zoom })
+    .catch((error) => ({ ...providerErrorSnapshot(provider, error), status: "degraded" as const }));
   try {
-    const snapshot = await runProvider(provider, { viewport, zoom });
-    void persistIntelligence([snapshot]).catch(() => undefined);
-    return NextResponse.json(snapshot, { headers: { "cache-control": "no-store" } });
+    await persistIntelligence([snapshot]);
   } catch (error) {
-    const snapshot = { ...providerErrorSnapshot(provider, error), status: "degraded" as const };
-    void persistIntelligence([snapshot]).catch(() => undefined);
-    return NextResponse.json(snapshot, { headers: { "cache-control": "no-store" } });
+    console.error(`Failed to persist provider response for ${providerId}`, error);
+    return NextResponse.json({ error: "Intelligence storage is unavailable" }, { status: 503 });
   }
+  return NextResponse.json(snapshot, { headers: { "cache-control": "no-store" } });
 }

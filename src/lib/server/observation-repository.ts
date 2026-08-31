@@ -5,9 +5,9 @@ import type { ObservationKind } from "../catalog/types";
 /**
  * Server-side observation access.
  *
- * The memory index keeps the application usable without Supabase. Persisted
- * reads use normalized, indexed observation rows; snapshot JSON is history,
- * not a query index.
+ * Persisted reads use normalized, indexed observation rows; snapshot JSON is
+ * history, not a query index. Memory storage is available only when explicitly
+ * selected for tests or database-free development.
  */
 
 export type ObservationQuery = {
@@ -28,7 +28,7 @@ export type ObservationQuery = {
 export type ObservationQueryResult = {
   observations: Observation[];
   total: number;
-  storage: "memory" | "persisted" | "mixed";
+  storage: "memory" | "persisted";
   nextCursor?: string;
 };
 
@@ -39,9 +39,14 @@ type ObservationCursor = { observedAt: string; riskScore: number; id: string };
 type PersistedObservationRow = { payload?: unknown; has_more?: boolean };
 
 function supabaseServer(): SupabaseClient | null {
+  if (process.env.OBSERVATION_STORAGE_MODE === "memory") return null;
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+}
+
+function memoryStorageEnabled() {
+  return process.env.OBSERVATION_STORAGE_MODE === "memory";
 }
 
 function scalarProperties(value: unknown) {
@@ -129,7 +134,10 @@ function decodeCursor(value?: string): ObservationCursor | null {
 
 async function persistedObservationPage(query: ObservationQuery, limit: number, cursor: ObservationCursor | null) {
   const client = supabaseServer();
-  if (!client) return { observations: [] as Observation[], total: 0, hasMore: false, available: false };
+  if (!client) {
+    if (memoryStorageEnabled()) return null;
+    throw new Error("Supabase observation storage is not configured");
+  }
 
   const { data, error } = await client.rpc("query_intelligence_observations", {
     p_ids: query.ids?.length ? query.ids : null,
@@ -151,7 +159,8 @@ async function persistedObservationPage(query: ObservationQuery, limit: number, 
     p_cursor_id: cursor?.id ?? null,
     p_limit: limit,
   });
-  if (error || !data) return { observations: [] as Observation[], total: 0, hasMore: false, available: false };
+  if (error) throw new Error(`Failed to query persisted observations: ${error.message}`);
+  if (!data) throw new Error("Failed to query persisted observations: empty response");
 
   const rows = data as PersistedObservationRow[];
   const observations = rows.map((row) => parseObservation(row.payload)).filter((observation): observation is Observation => Boolean(observation));
@@ -160,7 +169,6 @@ async function persistedObservationPage(query: ObservationQuery, limit: number, 
     observations,
     total: observations.length + (hasMore ? 1 : 0),
     hasMore,
-    available: true,
   };
 }
 
@@ -236,26 +244,29 @@ export async function queryObservations(query: ObservationQuery = {}): Promise<O
   const limit = Math.min(Math.max(query.limit ?? 500, 1), 2_000);
   const cursor = decodeCursor(query.cursor);
   const persisted = await persistedObservationPage(query, limit, cursor);
+  if (persisted) {
+    return {
+      observations: persisted.observations,
+      total: persisted.total,
+      storage: "persisted",
+      nextCursor: persisted.hasMore && persisted.observations.length ? encodeCursor(persisted.observations.at(-1)!) : undefined,
+    };
+  }
+
   const memoryMatches = [...memoryObservations.values()]
     .filter((observation) => matches(observation, query) && followsCursor(observation, cursor))
     .sort(observationOrder);
-  const combined = new Map<string, Observation>();
-  for (const observation of persisted.observations) combined.set(observation.id, observation);
-  for (const observation of memoryMatches) combined.set(observation.id, observation);
-  const combinedObservations = [...combined.values()].sort(observationOrder);
-  const observations = combinedObservations.slice(0, limit);
-  const total = Math.max(persisted.total, memoryMatches.length, combinedObservations.length);
-  const hasMore = persisted.hasMore || combinedObservations.length > observations.length;
+  const observations = memoryMatches.slice(0, limit);
+  const hasMore = memoryMatches.length > observations.length;
   return {
     observations,
-    total,
-    storage: persisted.observations.length && memoryMatches.length ? "mixed" : persisted.observations.length ? "persisted" : "memory",
+    total: memoryMatches.length,
+    storage: "memory",
     nextCursor: hasMore && observations.length ? encodeCursor(observations.at(-1)!) : undefined,
   };
 }
 
 export async function findObservationById(id: string) {
-  const local = memoryObservations.get(id);
-  if (local) return local;
+  if (memoryStorageEnabled()) return memoryObservations.get(id) ?? null;
   return (await queryObservations({ ids: [id], limit: 1 })).observations[0] ?? null;
 }

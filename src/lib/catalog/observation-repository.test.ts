@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { findObservationById, ingestObservations, queryObservations } from "../server/observation-repository.ts";
+import { persistIntelligence } from "../server/store.ts";
+
+process.env.OBSERVATION_STORAGE_MODE = "memory";
 
 test("queries ingested observations independently of a browser payload", async () => {
   const suffix = crypto.randomUUID();
@@ -74,4 +77,27 @@ test("paginates observations with a stable cursor and applies geographic filters
 
   const nearby = await queryObservations({ domains: [domain], center: { lat: 52.52, lng: 13.405 }, radiusKm: 10, limit: 10 });
   assert.deepEqual(nearby.observations.map((observation) => observation.id), [`${suffix}-newest`, `${suffix}-middle`]);
+});
+
+test("requires configured Supabase storage unless memory mode is explicit", async () => {
+  const names = [
+    "OBSERVATION_STORAGE_MODE",
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+  ] as const;
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  for (const name of names) delete process.env[name];
+
+  try {
+    await assert.rejects(queryObservations({ limit: 1 }), /Supabase observation storage is not configured/);
+    await assert.rejects(persistIntelligence([]), /Supabase intelligence storage is not configured/);
+  } finally {
+    for (const name of names) {
+      const value = previous[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
 });

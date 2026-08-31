@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
   const defaultLayers = defaultLayerIds;
   const requested = (rawLayers ? rawLayers.split(",") : defaultLayers).filter((layer): layer is Domain => allowed.has(layer));
   const result = await getSnapshot(requested);
-  await persistIntelligence(result.snapshots);
+  try {
+    await persistIntelligence(result.snapshots);
+  } catch (error) {
+    console.error("Failed to persist intelligence response", error);
+    return NextResponse.json({ error: "Intelligence storage is unavailable" }, { status: 503 });
+  }
   const overview = await requestOverview({
     trigger: "incoming-data",
     context: {

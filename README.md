@@ -47,8 +47,9 @@ curl http://localhost:3003/api/health
 Compose mounts `terracdm.yaml` read-only, stores local chat/overview/workflow
 state in the `terracdm_data` volume, exposes the app on port `3003`, and
 passes provider credentials only to the server. Set `TERRACDM_PORT` to use a
-different host port. Supabase remains optional and can be supplied through the
-server-only variables in `.env`; this package does not bundle a database.
+different host port. Intelligence observation reads and writes require the
+server-only Supabase variables in `.env`. Set `OBSERVATION_STORAGE_MODE=memory`
+only for tests or intentionally database-free development.
 
 ## Delivery plan
 
@@ -56,14 +57,14 @@ server-only variables in `.env`; this package does not bundle a database.
 2. **Agentic operations** — server tool registry, traceable plans/evidence, D3 force graph derived from incoming observations, entity drill-in, signal review, and recon actions.
 3. **Persistence and live providers** — Supabase watchlists/agent runs, Realtime broadcast boundary, server-side source adapters, and credentials-driven activation of key-gated feeds.
 
-The provider-backed WebGL canvas, domain routes, agent runtime, D3 graph, recon actions, polling refresh, optional Supabase Realtime, and persistence boundary are implemented. Supabase is opt-in through server environment variables; the migrations are ready to apply to the project you explicitly configure.
+The provider-backed WebGL canvas, domain routes, agent runtime, D3 graph, recon actions, polling refresh, optional Supabase Realtime, and persistence boundary are implemented. Supabase is authoritative for intelligence observations; the migrations are ready to apply to the project you explicitly configure.
 
 ## Supabase migration deployment
 
 Pushes that change `supabase/migrations/**` deploy migrations automatically: `staging` targets staging and `main` targets production. Configure these GitHub Actions secrets:
 
-- `STAGING_DB_URL`
-- `PROD_DB_URL`
+- Repository secret `STAGING_DB_URL` for staging
+- Environment secret `SUPABASE_DB_URL` in the `Production` environment
 
 The workflow can also be started manually with a staging/production target and an optional dry run. Use `staging` for day-to-day work, then merge `staging` into `main` to release the same migrations to production. The workflow serializes deployments per branch so concurrent migration pushes cannot run against the same project at once.
 

@@ -16,6 +16,10 @@ function supabaseServer(): SupabaseClient | null {
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
 }
 
+function memoryStorageEnabled() {
+  return process.env.OBSERVATION_STORAGE_MODE === "memory";
+}
+
 export async function saveAgentRun(run: Omit<AgentRun, "id" | "createdAt" | "storage">) {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
@@ -99,9 +103,12 @@ async function upsertObservationRows(client: SupabaseClient, observations: Obser
 
 export async function persistIntelligence(snapshots: CanonicalProviderSnapshot[]) {
   const observations = snapshots.flatMap((snapshot) => snapshot.observations);
-  ingestObservations(observations);
-  const client = supabaseServer();
-  if (!client) return { storage: "memory" as const, persisted: false };
+  const client = memoryStorageEnabled() ? null : supabaseServer();
+  if (!client) {
+    if (!memoryStorageEnabled()) throw new Error("Supabase intelligence storage is not configured");
+    ingestObservations(observations);
+    return { storage: "memory" as const, persisted: false };
+  }
   const snapshotRows = snapshots.map((item) => {
     const payload = { observations: item.observations, error: item.error ?? null };
     const contentHash = createHash("sha256").update(JSON.stringify({ sourceId: item.source.id, domain: item.domain, status: item.status, payload })).digest("hex");
@@ -109,18 +116,20 @@ export async function persistIntelligence(snapshots: CanonicalProviderSnapshot[]
   });
   const eventRows = snapshots.flatMap((item) => item.observations.filter((observation) => observation.kind === "signal").map((observation) => ({ event_id: observation.id, layer: observation.domain, source_id: observation.source.id, observed_at: observation.observedAt, payload: observation })));
   const snapshotResult = await client.from("intelligence_snapshots").upsert(snapshotRows, { onConflict: "source_id,content_hash", ignoreDuplicates: true });
-  if (snapshotResult.error) return { storage: "memory" as const, persisted: false, error: snapshotResult.error.message };
+  if (snapshotResult.error) throw new Error(`Failed to persist intelligence snapshots: ${snapshotResult.error.message}`);
   if (eventRows.length) {
     const eventResult = await client.from("intelligence_events").upsert(eventRows, { onConflict: "event_id" });
-    if (eventResult.error) return { storage: "supabase" as const, persisted: true, error: eventResult.error.message };
+    if (eventResult.error) throw new Error(`Failed to persist intelligence events: ${eventResult.error.message}`);
   }
   const observationError = await upsertObservationRows(client, observations);
-  if (observationError) return { storage: "supabase" as const, persisted: true, error: observationError.message };
+  if (observationError) throw new Error(`Failed to persist intelligence observations: ${observationError.message}`);
   try {
     const channel = client.channel("terracdm-intelligence");
     const result = await channel.httpSend("source-update", { fetchedAt: new Date().toISOString(), domains: snapshots.map((item) => item.domain) });
     if (!result.success) throw new Error(result.error);
     await client.removeChannel(channel);
-  } catch { /* persistence is still successful if broadcast is unavailable */ }
+  } catch (error) {
+    console.warn("Failed to broadcast intelligence update", error);
+  }
   return { storage: "supabase" as const, persisted: true };
 }
