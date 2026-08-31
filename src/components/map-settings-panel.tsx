@@ -34,10 +34,6 @@ export function MapSettingsPanel({ settings, onChange, onClose }: MapSettingsPan
         </select>
       </label>
       <div className="map-settings-field">
-        <span>TICKER FEED</span>
-        <button type="button" role="switch" aria-checked={settings.tickerVisible} className={`map-settings-toggle${settings.tickerVisible ? " active" : ""}`} onClick={() => onChange({ tickerVisible: !settings.tickerVisible })}><span>{settings.tickerVisible ? "Visible" : "Hidden"}</span><i aria-hidden="true" /></button>
-      </div>
-      <div className="map-settings-field">
         <span>SIGNAL PANEL</span>
         <button type="button" role="switch" aria-checked={settings.signalPanelEnabled} className={`map-settings-toggle${settings.signalPanelEnabled ? " active" : ""}`} onClick={() => onChange({ signalPanelEnabled: !settings.signalPanelEnabled })}><span>{settings.signalPanelEnabled ? "Enabled" : "Disabled"}</span><i aria-hidden="true" /></button>
       </div>

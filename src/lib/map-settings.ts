@@ -4,14 +4,12 @@ export type TimeFormat = "24h" | "12h";
 export type MapSettings = {
   timeZone: MapTimeZone;
   timeFormat: TimeFormat;
-  tickerVisible: boolean;
   signalPanelEnabled: boolean;
 };
 
 export const defaultMapSettings: MapSettings = {
   timeZone: "UTC",
   timeFormat: "24h",
-  tickerVisible: true,
   signalPanelEnabled: true,
 };
 
@@ -38,7 +36,6 @@ export function normalizeMapSettings(input: unknown): MapSettings {
   return {
     timeZone: isSupportedMapTimeZone(candidate.timeZone) ? candidate.timeZone : defaultMapSettings.timeZone,
     timeFormat: candidate.timeFormat === "12h" ? "12h" : defaultMapSettings.timeFormat,
-    tickerVisible: typeof candidate.tickerVisible === "boolean" ? candidate.tickerVisible : defaultMapSettings.tickerVisible,
     signalPanelEnabled: typeof candidate.signalPanelEnabled === "boolean" ? candidate.signalPanelEnabled : defaultMapSettings.signalPanelEnabled,
   };
 }

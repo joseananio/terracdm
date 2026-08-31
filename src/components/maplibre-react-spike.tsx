@@ -9,7 +9,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { defaultLayerIds, Domain, Entity, IntelligenceSnapshot, CanonicalProviderSnapshot, Signal, layerDetails, layers } from "@/src/lib/intelligence";
 import { LayerRail } from "@/src/components/layer-rail";
 import { IncomingSignalQueue } from "@/src/components/incoming-signal-queue";
-import { IntelligenceTicker } from "@/src/components/intelligence-ticker";
 import { MapHud, useMapLocation } from "@/src/components/map-hud";
 import { defaultMapSettings, normalizeMapSettings, type MapSettings } from "@/src/lib/map-settings";
 import { ActionDeck } from "@/src/components/action-deck";
@@ -68,19 +67,6 @@ const spikeDomains = layers.map((layer) => layer.id);
 const providerRoutes = getCatalog().providers.map((provider) => ({ providerId: provider.id, domain: provider.domain, url: `/api/providers/${encodeURIComponent(provider.id)}` }));
 const defaultDetailState: Record<string, string[]> = Object.fromEntries(layers.map((layer) => [layer.id, defaultLayerIds.includes(layer.id) && spikeDomains.includes(layer.id) ? ["all"] : []]));
 const satelliteTiles = "/api/tiles/satellite/{z}/{x}/{y}";
-const cartoDarkRasterStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    carto: {
-      type: "raster",
-      tiles: ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: "© CARTO, © OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "carto-dark", type: "raster", source: "carto" }],
-};
 const darkStyle: StyleSpecification = {
   version: 8,
   sources: {
@@ -593,6 +579,13 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
   const [error, setError] = useState<string | null>(null);
   const [projectionMode, setProjectionMode] = useState<"globe" | "flat">("globe");
   const [baseMode, setBaseMode] = useState<"map" | "carto" | "satellite">("map");
+  const cartoApiKey = process.env.NEXT_PUBLIC_CARTO_API_KEY?.trim();
+  const cartoEnabled = Boolean(cartoApiKey);
+  const [cartoStyle, setCartoStyle] = useState<StyleSpecification | null>(null);
+  const cartoLoadingRef = useRef(false);
+  useEffect(() => {
+    if (!cartoEnabled && baseMode === "carto") setBaseMode("map");
+  }, [baseMode, cartoEnabled]);
   const [selectedAircraft, setSelectedAircraft] = useState<Entity | null>(null);
   const [selectedIntelPoint, setSelectedIntelPoint] = useState<Entity | null>(null);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
@@ -717,7 +710,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     return [];
   });
   const mapStyle = useMemo<StyleSpecification>(() => {
-    if (baseMode === "carto") return cartoDarkRasterStyle;
+    if (baseMode === "carto" && cartoStyle) return cartoStyle;
     return {
       ...darkStyle,
       layers: darkStyle.layers.map((layer) => {
@@ -725,7 +718,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
         return { ...layer, layout: { ...(layer.layout ?? {}), visibility: baseMode === "map" ? "visible" : "none" } };
       }),
     };
-  }, [baseMode]);
+  }, [baseMode, cartoStyle]);
 
   const setProjection = (nextProjection: "globe" | "flat") => {
     setProjectionMode(nextProjection);
@@ -741,6 +734,23 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
 
   const setBase = (nextBase: "map" | "carto" | "satellite") => {
     if (nextBase === baseMode) return;
+    if (nextBase === "carto") {
+      if (!cartoApiKey || cartoLoadingRef.current) return;
+      if (cartoStyle) {
+        setBaseMode("carto");
+        return;
+      }
+      cartoLoadingRef.current = true;
+      void import("@/src/lib/map/carto-style")
+        .then(({ createCartoDarkRasterStyle }) => {
+          setCartoStyle(createCartoDarkRasterStyle(cartoApiKey));
+          setBaseMode("carto");
+        })
+        .finally(() => {
+          cartoLoadingRef.current = false;
+        });
+      return;
+    }
     setBaseMode(nextBase);
   };
 
@@ -1081,7 +1091,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
       <button type="button" className={projectionMode === "flat" ? "active" : ""} onClick={() => setProjection("flat")} aria-pressed={projectionMode === "flat"} aria-label="2D flat map view">2D</button>
       <span className="map-control-divider" aria-hidden="true" />
       <button type="button" className={baseMode === "map" ? "active" : ""} onClick={() => setBase("map")} aria-pressed={baseMode === "map"} aria-label="Esri dark gray map base">MAP</button>
-      <button type="button" className={baseMode === "carto" ? "active" : ""} onClick={() => setBase("carto")} aria-pressed={baseMode === "carto"} aria-label="Carto dark map base">CARTO</button>
+      {cartoEnabled && <button type="button" className={baseMode === "carto" ? "active" : ""} onClick={() => setBase("carto")} aria-pressed={baseMode === "carto"} aria-label="Carto dark map base">CARTO</button>}
       <button type="button" className={baseMode === "satellite" ? "active" : ""} onClick={() => setBase("satellite")} aria-pressed={baseMode === "satellite"} aria-label="Satellite imagery base">SAT</button>
     </div>}
     {snapshot.fetchedAt && <LayerRail activeLayers={activeSpikeDomains} loadingLayers={loadingLayers} detailState={detailState} layersData={layers} snapshot={snapshot} selectedLayer={selectedLayer} open={layerOpen} onSelect={(domain) => { setSelectedLayer(domain); setLayerOpen(true); }} onToggleLayer={() => undefined} onToggleAll={toggleAllLayers} onToggleDetail={toggleDetail} onClose={() => setLayerOpen(false)} />}
@@ -1094,7 +1104,6 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
       { label: "SCALE", value: formatScale(hud.scaleKm), tone: "amber" },
       { label: "CURSOR LON LAT", value: hud.cursor ? `${formatCoordinate(hud.cursor[1], "N", "S")} ${formatCoordinate(hud.cursor[0], "E", "W")}` : "—" },
     ]} />}
-    {snapshot.fetchedAt && <IntelligenceTicker signals={signals} feedVisible={mapSettings.tickerVisible} />}
     {typeof document !== "undefined" && snapshot.fetchedAt && createPortal(<div className="workspace-tool-layer" style={{ "--workspace-tool-anchor-x": `${workspaceToolAnchorX}px` } as CSSProperties}>
       {utilityTool === "actions" && !agentCommand && !deterministicAction && <aside className="spike-actions-overlay" aria-label="Actions"><button type="button" className="spike-actions-close" onClick={() => setUtilityTool("home")} aria-label="Close actions"><X size={15} /></button><ActionDeck onAction={(action) => { setDeterministicAction(action); setUtilityTool("home"); }} onAgent={() => setAgentCommand("Triage the highest risk incoming signals now")} onOverview={() => { setAgentCommand("Open the current map overview"); setUtilityTool("home"); }} /></aside>}
       {deterministicAction && <DeterministicActionSheet variant="map" action={deterministicAction} onClose={() => { setDeterministicAction(null); setUtilityTool("home"); }} />}

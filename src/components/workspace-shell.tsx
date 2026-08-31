@@ -344,7 +344,6 @@ function SettingsWorkspace({ ready, settings, onChange }: WorkspaceMapSettingsSt
       </section>
       <section>
         <h2>Map</h2>
-        <div className="workspace-settings-row"><span>Ticker feed</span><button type="button" role="switch" aria-checked={settings.tickerVisible} className={settings.tickerVisible ? "active" : ""} disabled={!ready} onClick={() => onChange({ tickerVisible: !settings.tickerVisible })}><span>{settings.tickerVisible ? "Visible" : "Hidden"}</span><i aria-hidden="true" /></button></div>
         <div className="workspace-settings-row"><span>Signal panel</span><button type="button" role="switch" aria-checked={settings.signalPanelEnabled} className={settings.signalPanelEnabled ? "active" : ""} disabled={!ready} onClick={() => onChange({ signalPanelEnabled: !settings.signalPanelEnabled })}><span>{settings.signalPanelEnabled ? "Enabled" : "Disabled"}</span><i aria-hidden="true" /></button></div>
       </section>
     </div>

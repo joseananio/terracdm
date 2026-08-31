@@ -14,3 +14,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Prefer the smallest useful label and the clearest action. If the content is already obvious from its placement, do not label it again.
 - Do not invent sections such as “saved,” “stored,” “operational brief,” “map intelligence,” “next questions,” or similar framing copy just to make a panel feel complete. Keep generated content, necessary controls, and user-selected actions; remove redundant framing text.
 - Before presenting a UI change, inspect the rendered surface for duplicate headings, repeated summaries, and irrelevant metadata. Treat prior requests to remove such text as an ongoing project preference.
+
+## Git publishing
+
+- Do not push commits or otherwise publish repository changes without explicit user approval in the current conversation.
