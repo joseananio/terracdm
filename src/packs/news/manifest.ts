@@ -5,7 +5,7 @@ export const newsManifest = defineCodePackManifest({
   label: "Live broadcast",
   short: "NEWS",
   color: "#71f0e6",
-  source: "GDELT / BBC / TechRadar RSS",
+  source: "GDELT / public RSS",
   sourceId: "news-network",
   status: "live",
   defaultEnabled: true,

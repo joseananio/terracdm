@@ -34,12 +34,28 @@ const youtubeLiveChannels: Record<string, string> = {
 };
 
 const officialHlsSources: Record<string, string> = { "France 24": "https://live.france24.com/hls/live/2037218-b/F24_EN_HI_HLS/master_5000.m3u8" };
-const rssFallbacks = [["BBC World RSS", "https://feeds.bbci.co.uk/news/world/rss.xml"], ["Al Jazeera RSS", "https://www.aljazeera.com/xml/rss/all.xml"], ["GDACS RSS", "https://www.gdacs.org/xml/rss.xml"], ["TechRadar RSS", "https://www.techradar.com/feeds.xml"]] as const;
+const rssFallbacks = [["BBC World RSS", "https://feeds.bbci.co.uk/news/world/rss.xml"], ["Al Jazeera RSS", "https://www.aljazeera.com/xml/rss/all.xml"], ["GDACS RSS", "https://www.gdacs.org/xml/rss.xml"], ["TechRadar RSS", "https://www.techradar.com/feeds.xml"], ["CISA Cybersecurity Advisories", "https://www.cisa.gov/cybersecurity-advisories/all.xml"], ["NOAA Storm Prediction Center", "https://www.spc.noaa.gov/products/spcrss.xml"], ["NHC Atlantic Tropical Cyclones", "https://www.nhc.noaa.gov/index-at.xml"], ["ReliefWeb Updates", "https://reliefweb.int/updates/rss.xml"], ["UN News", "https://news.un.org/feed/subscribe/en/news/all/rss.xml"]] as const;
 
 function parseRssItems(xml: string, source: string) {
   const channelImage = xml.match(/<channel\b[^>]*>[\s\S]*?<image\b[^>]*>([\s\S]*?)<\/image>/i);
   const channelImageUrl = safeUrl(channelImage ? textTag(channelImage[1], "url") : "");
   return (xml.match(/<item>[\s\S]*?<\/item>/gi) ?? []).map((item) => ({ title: stripHtml(textTag(item, "title")), detail: stripHtml(textTag(item, "description")).slice(0, 180), published: textTag(item, "pubDate"), source, url: textTag(item, "link"), imageUrl: tagUrl(item, "media:content") ?? tagUrl(item, "enclosure") ?? tagUrl(item, "media:thumbnail") ?? channelImageUrl })).filter((item) => item.title);
+}
+
+function roundRobinRssItems(feeds: ReturnType<typeof parseRssItems>[], limit: number) {
+  const items: ReturnType<typeof parseRssItems>[number][] = [];
+  for (let index = 0; items.length < limit; index += 1) {
+    let added = false;
+    for (const feed of feeds) {
+      const item = feed[index];
+      if (!item) continue;
+      items.push(item);
+      added = true;
+      if (items.length === limit) break;
+    }
+    if (!added) break;
+  }
+  return items;
 }
 
 function formatGdeltTime(value?: string) {
@@ -62,10 +78,11 @@ export const newsProviderImplementation: ProviderImplementation = async ({ pack,
     signals = (data.articles ?? []).slice(0, 20).map((article, index) => ({ id: `gdelt:${article.url ?? index}`, kind: "signal" as const, domain: pack.domain, subdomainId: reportSubdomain, name: String(article.title ?? "Global report"), description: `${article.domain ?? "unknown source"} · ${article.sourcecountry ?? "—"}`, risk: "low" as const, riskScore: 20, location: { label: article.sourcecountry ?? "global" }, source: { id: "gdelt", name: "GDELT", url: article.url }, providerId: provider.id, observedAt: gdeltObservedAt(article.seendate), url: article.url }));
   } catch (cause) {
     error = cause instanceof Error ? cause.message : "GDELT request failed";
-    const fallbackResults = await Promise.allSettled(rssFallbacks.map(async ([rssSource, rssUrl]) => ({ rssSource, items: parseRssItems(await fetchText(rssUrl, { headers: { accept: "application/rss+xml,application/xml,text/xml,*/*" } }), rssSource) })));
-    const fallbackItems = fallbackResults.flatMap((result) => result.status === "fulfilled" ? result.value.items : []);
+    const fallbackResults = await Promise.allSettled(rssFallbacks.map(async ([rssSource, rssUrl]) => ({ rssSource, items: parseRssItems(await fetchText(rssUrl, { headers: { accept: "application/rss+xml,application/xml,text/xml,*/*", "user-agent": "TerraCDM/0.1" } }), rssSource) })));
+    const fallbackFeeds = fallbackResults.flatMap((result) => result.status === "fulfilled" ? [result.value.items] : []);
+    const fallbackItems = roundRobinRssItems(fallbackFeeds, 30);
     signals = fallbackItems.slice(0, 30).map((item, index) => ({ id: `rss:${item.source.toLowerCase().replace(/[^a-z0-9]+/g, "-")}:${index}:${item.url || item.title}`, kind: "signal" as const, domain: pack.domain, subdomainId: reportSubdomain, name: item.title, description: item.detail, risk: "low" as const, riskScore: 20, location: { label: item.source.replace(/ RSS$/, "") }, source: { id: item.source.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name: item.source, url: item.url }, providerId: provider.id, observedAt: isoTime(item.published), url: item.url, imageUrl: item.imageUrl }));
-    source = fallbackItems.length ? "BBC / Al Jazeera / GDACS / TechRadar RSS" : source;
+    source = fallbackItems.length ? "BBC / Al Jazeera / GDACS / TechRadar / CISA / NOAA / NHC / ReliefWeb / UN RSS" : source;
     if (!fallbackItems.length) error = `${error}; RSS fallback: unavailable`;
   }
 
@@ -83,6 +100,6 @@ export const newsProviderImplementation: ProviderImplementation = async ({ pack,
     return { id: `broadcast:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, kind: "entity" as const, domain: pack.domain, subdomainId: broadcasterSubdomain, name, description: mediaDescriptor, risk: riskFromScore(8), riskScore: 8, location: { coordinates: { lat, lng }, label: name }, source: { id: "broadcast-registry", name: "Broadcaster registry", url }, providerId: provider.id, observedAt: new Date().toISOString(), url, media: sourceMedia, mediaSources, properties: { liveUrl: url, embedUrl: youtubeFallback?.url ?? null, mediaKind: sourceMedia.kind, mediaHealth: health?.status ?? "not-tested", mediaManifestStatus: health?.manifestStatus ?? null, mediaCors: health?.cors ?? "unknown", mediaGeo: health?.geo ?? "unknown", mediaSegmentFreshness: health?.segmentFreshness ?? "unknown", mediaCheckedAt: health?.checkedAt ?? null, mediaError: health?.error ?? null, mediaFallback: hlsMedia?.fallback?.kind ?? null } };
   }));
 
-  const snapshot: ProviderSnapshot = { domain: pack.domain, providerId: provider.id, source: { id: signals.length && source.toLowerCase().includes("gdelt") ? "gdelt" : "rss-fallback", name: "GDELT / BBC RSS / Al Jazeera RSS / GDACS RSS / TechRadar RSS / broadcaster registry" }, status: signals.length ? "live" : "degraded", fetchedAt: new Date().toISOString(), observations: [...entities, ...signals], error: signals.length ? undefined : error, nextPollSeconds: provider.pollSeconds ?? 60 };
+  const snapshot: ProviderSnapshot = { domain: pack.domain, providerId: provider.id, source: { id: signals.length && source.toLowerCase().includes("gdelt") ? "gdelt" : "rss-fallback", name: "GDELT / BBC RSS / Al Jazeera RSS / GDACS RSS / TechRadar RSS / CISA / NOAA SPC / NHC / ReliefWeb / UN News / broadcaster registry" }, status: signals.length ? "live" : "degraded", fetchedAt: new Date().toISOString(), observations: [...entities, ...signals], error: signals.length ? undefined : error, nextPollSeconds: provider.pollSeconds ?? 60 };
   return snapshot;
 };
