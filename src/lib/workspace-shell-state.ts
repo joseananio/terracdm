@@ -1,8 +1,8 @@
 export const workspaceLenses = ["signals", "brief", "cases", "entities", "graph", "map", "settings"] as const;
 
 export type WorkspaceLens = (typeof workspaceLenses)[number];
-export type InspectorKind = "signal" | "entity" | "case" | "evidence" | "node";
-export type InspectorRef = { kind: InspectorKind; id: string; sourceLens: WorkspaceLens };
+export type InspectorKind = "signal" | "entity" | "case" | "evidence" | "node" | "note";
+export type InspectorRef = { kind: InspectorKind; id: string; sourceLens: WorkspaceLens; title?: string; body?: string; updatedAt?: string };
 export type InspectorState = { content: InspectorRef; presentation: "overlay" | "split" };
 
 export type WorkspaceShellState = {
@@ -71,7 +71,7 @@ export function readWorkspaceLocation(search: string): Partial<WorkspaceShellSta
   const source = params.get("from");
   const presentation: InspectorState["presentation"] = params.get("panel") === "split" ? "split" : "overlay";
   const activeLens = isWorkspaceLens(lens) ? lens : undefined;
-  const inspector = kind && id && ["signal", "entity", "case", "evidence", "node"].includes(kind)
+  const inspector = kind && id && ["signal", "entity", "case", "evidence", "node", "note"].includes(kind)
     ? { content: { kind: kind as InspectorKind, id, sourceLens: isWorkspaceLens(source) ? source : activeLens ?? "map" }, presentation }
     : undefined;
   return { ...(activeLens ? { activeLens } : {}), ...(inspector ? { inspector } : {}) };

@@ -5,9 +5,7 @@ import dynamic from "next/dynamic";
 import {
   Article,
   Bell,
-  CaretDown,
   CaretRight,
-  Check,
   ChatCircleText,
   CirclesThreePlus,
   FolderOpen,
@@ -26,6 +24,8 @@ import {
 } from "@phosphor-icons/react";
 import { MaplibreReactSpike, type WorkspaceMapSettingsRequest, type WorkspaceMapSettingsState, type WorkspaceSearchCorpus, type WorkspaceSearchSelection, type WorkspaceToolRequest, type WorkspaceToolState } from "@/src/components/maplibre-react-spike";
 import { SignalIcon } from "@/src/components/incoming-signal-queue";
+import { WorkspaceMenu, WorkspaceSelect } from "@/src/components/workspace-controls";
+import { CasesWorkspace } from "@/src/components/cases-workspace";
 import type { BriefDevelopment } from "@/src/lib/brief";
 import type { ChatReference } from "@/src/lib/server/chat";
 import type { FeedStatus } from "@/src/lib/feed-status";
@@ -37,37 +37,6 @@ import { defaultWorkspaceShellState, readWorkspaceLocation, workspaceLenses, wor
 const BriefWorkspace = dynamic(() => import("@/src/components/brief-workspace").then((module) => module.BriefWorkspace), { ssr: false });
 
 type WorkspaceMode = WorkspaceLens;
-
-type CompactMenuOption<T extends string> = { value: T; label: string };
-
-function CompactMenu<T extends string>({ ariaLabel, className, onChange, options, value }: { ariaLabel: string; className: string; onChange: (value: T) => void; options: CompactMenuOption<T>[]; value: T }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.value === value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!(event.target instanceof Node && rootRef.current?.contains(event.target))) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
-  return <div ref={rootRef} className={`${className}${open ? " open" : ""}`}>
-    <button type="button" className="workspace-compact-menu-trigger" aria-label={ariaLabel} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-      <span>{selected.label}</span><CaretDown size={14} aria-hidden="true" />
-    </button>
-    {open && <div className="workspace-compact-menu-options" role="menu" aria-label={ariaLabel}>
-      {options.map((option) => <button key={option.value} type="button" role="menuitemradio" aria-checked={option.value === value} onClick={() => { onChange(option.value); setOpen(false); }}><span>{option.label}</span>{option.value === value && <Check size={13} />}</button>)}
-    </div>}
-  </div>;
-}
 
 type ModeDefinition = {
   id: WorkspaceMode;
@@ -233,9 +202,9 @@ function SignalWorkspace({ onInspect, signals }: { onInspect: (content: Inspecto
         <button className={filter === "unread" ? "active" : ""} onClick={() => setFilter("unread")}>Unread <span>{unreadCount}</span></button>
         <button className={filter === "watchlist" ? "active" : ""} onClick={() => setFilter("watchlist")}>Watchlist <span>{watchedIds.size}</span></button>
       </nav>
-      <CompactMenu className="workspace-signals-sort workspace-filter-menu" ariaLabel="Filter signals" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "high", label: "High risk" }, { value: "unread", label: `Unread ${unreadCount}` }, { value: "watchlist", label: `Watchlist ${watchedIds.size}` }]} />
+      <WorkspaceMenu className="workspace-signals-sort workspace-filter-menu" ariaLabel="Filter signals" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "high", label: "High risk" }, { value: "unread", label: `Unread ${unreadCount}` }, { value: "watchlist", label: `Watchlist ${watchedIds.size}` }]} />
       <label className="workspace-signals-search"><MagnifyingGlass size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter signals" aria-label="Filter signals" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Clear signal filter"><X size={13} /></button>}</label>
-      <CompactMenu className="workspace-signals-sort" ariaLabel="Sort signals" value={sort} onChange={setSort} options={[{ value: "newest", label: "Newest" }, { value: "risk", label: "Highest risk" }]} />
+      <WorkspaceMenu className="workspace-signals-sort" ariaLabel="Sort signals" value={sort} onChange={setSort} options={[{ value: "newest", label: "Newest" }, { value: "risk", label: "Highest risk" }]} />
     </div>
     <div className="workspace-signal-columns" aria-hidden="true"><span>Signal</span><span>Domain</span><span>Source</span><span>Observed</span><span /></div>
     {visibleSignals.length > 0 ? <div className="workspace-signal-list">{visibleSignals.map((signal) => {
@@ -287,9 +256,9 @@ function EntityWorkspace({ entities, onInspect }: { entities: Entity[]; onInspec
         <button className={filter === "located" ? "active" : ""} onClick={() => setFilter("located")}>Located</button>
         <button className={filter === "watchlist" ? "active" : ""} onClick={() => setFilter("watchlist")}>Watchlist <span>{watchedIds.size}</span></button>
       </nav>
-      <CompactMenu className="workspace-signals-sort workspace-filter-menu" ariaLabel="Filter entities" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "high", label: "High risk" }, { value: "located", label: "Located" }, { value: "watchlist", label: `Watchlist ${watchedIds.size}` }]} />
+      <WorkspaceMenu className="workspace-signals-sort workspace-filter-menu" ariaLabel="Filter entities" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "high", label: "High risk" }, { value: "located", label: "Located" }, { value: "watchlist", label: `Watchlist ${watchedIds.size}` }]} />
       <label className="workspace-signals-search"><MagnifyingGlass size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter entities" aria-label="Filter entities" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Clear entity filter"><X size={13} /></button>}</label>
-      <CompactMenu className="workspace-signals-sort" ariaLabel="Sort entities" value={sort} onChange={setSort} options={[{ value: "newest", label: "Newest" }, { value: "risk", label: "Highest risk" }, { value: "name", label: "Name" }]} />
+      <WorkspaceMenu className="workspace-signals-sort" ariaLabel="Sort entities" value={sort} onChange={setSort} options={[{ value: "newest", label: "Newest" }, { value: "risk", label: "Highest risk" }, { value: "name", label: "Name" }]} />
     </div>
     <div className="workspace-signal-columns" aria-hidden="true"><span>Entity</span><span>Domain</span><span>Location</span><span>Observed</span><span /></div>
     {visibleEntities.length > 0 ? <div className="workspace-signal-list">{visibleEntities.map((entity) => {
@@ -327,11 +296,12 @@ function ModeFoundation({ mode }: { mode: Exclude<WorkspaceMode, "map" | "settin
   );
 }
 
-function InspectorPanel({ content, corpus, onClose, onPin, onUnpin, onViewMap, presentation }: { content: InspectorRef; corpus: WorkspaceSearchCorpus; onClose: () => void; onPin: () => void; onUnpin: () => void; onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void; presentation: "overlay" | "split" }) {
+function InspectorPanel({ content, corpus, onAddToCase, onClose, onPin, onUnpin, onViewMap, presentation }: { content: InspectorRef; corpus: WorkspaceSearchCorpus; onAddToCase: (content: InspectorRef) => void; onClose: () => void; onPin: () => void; onUnpin: () => void; onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void; presentation: "overlay" | "split" }) {
   const record = content.kind === "signal" ? corpus.signals.find((item) => item.id === content.id) : content.kind === "entity" ? corpus.entities.find((item) => item.id === content.id) : undefined;
+  const textContent = (content.kind === "note" || content.kind === "evidence") && content.body ? content : undefined;
   return <aside className={`workspace-inspector workspace-inspector-${presentation}`} aria-label={`${content.kind} inspector`}>
     <header><span>{content.kind}</span><div><button type="button" onClick={presentation === "split" ? onUnpin : onPin} aria-label={presentation === "split" ? "Unpin inspector" : "Pin inspector"} title={presentation === "split" ? "Unpin" : "Pin"}><PushPin size={15} weight={presentation === "split" ? "fill" : "regular"} /></button><button type="button" onClick={onClose} aria-label="Close inspector"><X size={16} /></button></div></header>
-    {record ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className={`workspace-inspector-icon ${record.risk}`}><SignalIcon domain={record.domain} /></span><span className={`workspace-inspector-risk ${record.risk}`}>{record.risk} risk</span></div><h2>{record.name}</h2><p>{record.description || "No description available."}</p><dl><div><dt>Observed</dt><dd>{new Date(record.observedAt).toLocaleString()}</dd></div><div><dt>Domain</dt><dd>{record.domain}</dd></div><div><dt>Risk score</dt><dd>{record.riskScore}</dd></div>{record.location?.label && <div><dt>Location</dt><dd>{record.location.label}</dd></div>}<div><dt>Source</dt><dd>{record.source.name}</dd></div><div><dt>Provider</dt><dd>{record.providerId}</dd></div></dl><div className="workspace-inspector-actions">{record.location?.coordinates && <button type="button" className="workspace-inspector-map" onClick={() => onViewMap({ kind: record.kind, value: record } as Omit<WorkspaceSearchSelection, "token">)}><MapTrifold size={15} />View on map<ArrowSquareOut size={13} /></button>}{record.url && <a href={record.url} target="_blank" rel="noreferrer">Open source<ArrowSquareOut size={13} /></a>}</div></div> : <div className="workspace-inspector-missing"><p>This object is not available in the current intelligence snapshot.</p></div>}
+    {record ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className={`workspace-inspector-icon ${record.risk}`}><SignalIcon domain={record.domain} /></span><span className={`workspace-inspector-risk ${record.risk}`}>{record.risk} risk</span></div><h2>{record.name}</h2><p>{record.description || "No description available."}</p><dl><div><dt>Observed</dt><dd>{new Date(record.observedAt).toLocaleString()}</dd></div><div><dt>Domain</dt><dd>{record.domain}</dd></div><div><dt>Risk score</dt><dd>{record.riskScore}</dd></div>{record.location?.label && <div><dt>Location</dt><dd>{record.location.label}</dd></div>}<div><dt>Source</dt><dd>{record.source.name}</dd></div><div><dt>Provider</dt><dd>{record.providerId}</dd></div></dl><div className="workspace-inspector-actions"><button type="button" onClick={() => onAddToCase(content)}><FolderOpen size={15} />Add to case</button>{record.location?.coordinates && <button type="button" className="workspace-inspector-map" onClick={() => onViewMap({ kind: record.kind, value: record } as Omit<WorkspaceSearchSelection, "token">)}><MapTrifold size={15} />View on map<ArrowSquareOut size={13} /></button>}{record.url && <a href={record.url} target="_blank" rel="noreferrer">Open source<ArrowSquareOut size={13} /></a>}</div></div> : textContent ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className="workspace-inspector-risk">{content.kind}</span></div><h2>{textContent.title || (content.kind === "note" ? "Case note" : "Evidence")}</h2><p>{textContent.body}</p>{textContent.updatedAt && <dl><div><dt>Updated</dt><dd>{new Date(textContent.updatedAt).toLocaleString()}</dd></div></dl>}</div> : <div className="workspace-inspector-missing"><p>This object is not available in the current intelligence snapshot.</p></div>}
   </aside>;
 }
 
@@ -341,8 +311,8 @@ function SettingsWorkspace({ ready, settings, onChange }: WorkspaceMapSettingsSt
     <div className="workspace-settings-grid" aria-busy={!ready}>
       <section>
         <h2>Time</h2>
-        <label><span>Time zone</span><select value={settings.timeZone} disabled={!ready} onChange={(event) => onChange({ timeZone: event.target.value as MapTimeZone })}>{timeZoneOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label><span>Time format</span><select value={settings.timeFormat} disabled={!ready} onChange={(event) => onChange({ timeFormat: event.target.value as TimeFormat })}><option value="24h">24-hour</option><option value="12h">12-hour</option></select></label>
+        <div className="workspace-setting-control"><span>Time zone</span><WorkspaceSelect ariaLabel="Time zone" value={settings.timeZone} disabled={!ready} onChange={(value) => onChange({ timeZone: value as MapTimeZone })} options={timeZoneOptions} /></div>
+        <div className="workspace-setting-control"><span>Time format</span><WorkspaceSelect ariaLabel="Time format" value={settings.timeFormat} disabled={!ready} onChange={(value) => onChange({ timeFormat: value as TimeFormat })} options={[{ value: "24h", label: "24-hour" }, { value: "12h", label: "12-hour" }]} /></div>
       </section>
       <section>
         <h2>Map</h2>
@@ -362,6 +332,7 @@ export function WorkspaceShell() {
   const [workspaceToolRequest, setWorkspaceToolRequest] = useState<WorkspaceToolRequest | null>(null);
   const [workspaceToolState, setWorkspaceToolState] = useState<WorkspaceToolState>({ chatOpen: false, actionsOpen: false });
   const [briefUnread, setBriefUnread] = useState(false);
+  const [caseHandoffToken, setCaseHandoffToken] = useState(0);
   const [mapSettingsState, setMapSettingsState] = useState<WorkspaceMapSettingsState>({ settings: defaultMapSettings, ready: false });
   const [mapSettingsRequest, setMapSettingsRequest] = useState<WorkspaceMapSettingsRequest | null>(null);
   const [renderedSplitContent, setRenderedSplitContent] = useState<InspectorRef | null>(null);
@@ -474,6 +445,18 @@ export function WorkspaceShell() {
     setWorkspaceToolRequest({ kind: "chat", anchorX: window.innerWidth - 180, token: Date.now(), prompt, references });
   };
 
+  const openCaseHandoff = (content: InspectorRef) => {
+    window.localStorage.setItem("terracdm:cases:handoff", JSON.stringify({ kind: content.kind, id: content.id }));
+    dispatch({ type: "close-inspector" });
+    setCaseHandoffToken((token) => token + 1);
+    setMode("cases");
+  };
+
+  const navigateFromBrief = (lens: WorkspaceLens) => {
+    if (lens === "cases") setCaseHandoffToken((token) => token + 1);
+    setMode(lens);
+  };
+
   const updateMapSettings = (change: Partial<MapSettings>) => setMapSettingsRequest({ change, token: Date.now() });
 
   const splitOpen = shell.inspector?.presentation === "split";
@@ -505,8 +488,8 @@ export function WorkspaceShell() {
         <nav className="workspace-mode-nav" aria-label="Workspace modes">
           {modes.map(({ id, label, icon: Icon, shortcut }) => <button key={id} type="button" className={mode === id ? "active" : ""} onClick={() => setMode(id)} aria-current={mode === id ? "page" : undefined} title={`${label} · ${shortcut}`}><Icon size={15} weight={mode === id ? "fill" : "regular"} /><span>{label}</span>{id === "brief" && briefUnread && <i className="workspace-nav-unread" />}</button>)}
         </nav>
-        {splitOpen && <CompactMenu className="workspace-mode-select workspace-desktop-mode-select" ariaLabel="Workspace view" value={mode} onChange={setMode} options={[...modes.map(({ id, label }) => ({ value: id, label })), { value: "settings", label: "Settings" }]} />}
-        <CompactMenu className="workspace-mode-select workspace-mobile-mode-select" ariaLabel="Workspace navigation" value={mode} onChange={setMode} options={[...modes.map(({ id, label }) => ({ value: id, label })), { value: "settings", label: "Settings" }]} />
+        {splitOpen && <WorkspaceMenu className="workspace-mode-select workspace-desktop-mode-select" ariaLabel="Workspace view" value={mode} onChange={setMode} options={[...modes.map(({ id, label }) => ({ value: id, label })), { value: "settings", label: "Settings" }]} />}
+        <WorkspaceMenu className="workspace-mode-select workspace-mobile-mode-select" ariaLabel="Workspace navigation" presentation="drawer" value={mode} onChange={setMode} options={[...modes.map(({ id, label }) => ({ value: id, label })), { value: "settings", label: "Settings" }]} />
         <SearchPalette corpus={searchCorpus} inputRef={searchInputRef} onOpenChange={setSearchOpen} onSelect={selectSearchResult} open={searchOpen} query={searchQuery} setQuery={setSearchQuery} />
         <div className="workspace-navbar-tools" role="group" aria-label="Workspace tools">
           <button className={workspaceToolState.chatOpen ? "workspace-navbar-tool active" : "workspace-navbar-tool"} type="button" onClick={(event) => toggleWorkspaceTool("chat", event.currentTarget)} aria-label="Open analyst chat" aria-pressed={workspaceToolState.chatOpen}><ChatCircleText size={17} /></button>
@@ -519,13 +502,13 @@ export function WorkspaceShell() {
       <div className="workspace-stage">
         <div className="workspace-lens-stage">
           <div className={`workspace-map-stage${mode === "map" ? " active" : ""}`} aria-hidden={mode !== "map"} {...(mode !== "map" ? { inert: true } : {})}><MaplibreReactSpike mapSettingsRequest={mapSettingsRequest} onFeedStatusChange={setFeedStatus} onMapSettingsStateChange={setMapSettingsState} onOpenSignalsWorkspace={() => setMode("signals")} onSearchCorpusChange={setSearchCorpus} onWorkspaceToolStateChange={setWorkspaceToolState} searchSelection={searchSelection} workspaceToolRequest={workspaceToolRequest} /></div>
-          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : <ModeFoundation mode={lens} />}</div>)}
+          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : <ModeFoundation mode={lens} />}</div>)}
           {shell.visitedLenses.includes("settings") && <div className={`workspace-lens${mode === "settings" ? " active" : ""}`} aria-hidden={mode !== "settings"} {...(mode !== "settings" ? { inert: true } : {})}><SettingsWorkspace {...mapSettingsState} onChange={updateMapSettings} /></div>}
-          {shell.inspector?.presentation === "overlay" && <><button type="button" className="workspace-inspector-scrim" onClick={() => dispatch({ type: "close-inspector" })} aria-label="Close inspector" /><InspectorPanel content={shell.inspector.content} corpus={searchCorpus} presentation="overlay" onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} /></>}
+          {shell.inspector?.presentation === "overlay" && <><button type="button" className="workspace-inspector-scrim" onClick={() => dispatch({ type: "close-inspector" })} aria-label="Close inspector" /><InspectorPanel content={shell.inspector.content} corpus={searchCorpus} presentation="overlay" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} /></>}
         </div>
       </div>
       </div>
-      <div className={`workspace-split${splitExiting ? " exiting" : ""}`} aria-hidden={!splitOpen}><button type="button" className="workspace-split-handle" onPointerDown={beginSplitResize} onPointerMove={resizeSplit} onPointerUp={() => { splitDragRef.current = null; }} aria-label="Resize inspector" tabIndex={splitOpen ? 0 : -1} />{renderedSplitContent && <InspectorPanel content={renderedSplitContent} corpus={searchCorpus} presentation="split" onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} />}</div>
+      <div className={`workspace-split${splitExiting ? " exiting" : ""}`} aria-hidden={!splitOpen}><button type="button" className="workspace-split-handle" onPointerDown={beginSplitResize} onPointerMove={resizeSplit} onPointerUp={() => { splitDragRef.current = null; }} aria-label="Resize inspector" tabIndex={splitOpen ? 0 : -1} />{renderedSplitContent && <InspectorPanel content={renderedSplitContent} corpus={searchCorpus} presentation="split" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} />}</div>
     </main>
   );
 }

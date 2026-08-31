@@ -63,13 +63,13 @@ This tracks the original signal-first interface plan against the current impleme
 ## Cases and timelines
 
 - [x] Add the Cases lens shell.
-- [ ] Define the Case data model, persistence, ownership, and status lifecycle.
-- [ ] Create cases manually and cluster signals into cases automatically where appropriate.
-- [ ] Add Add to case from Signals, Entities, search results, and inspectors.
-- [ ] Build the Case workspace with summary, signals, entities, evidence, relationships, media, notes, and actions.
-- [ ] Build a vertical event stream for reading and triage.
+- [x] Define the Case data model, persistence, workspace ownership, and status lifecycle.
+- [ ] Create cases manually and cluster signals into cases automatically where appropriate. Manual creation is complete; automatic clustering remains.
+- [ ] Add Add to case from Signals, Entities, search results, and inspectors. Brief and inspector handoffs are complete; direct list and search-result actions remain.
+- [ ] Build the Case workspace with summary, signals, entities, evidence, relationships, media, notes, and actions. The core workspace is complete; media remains.
+- [x] Build a vertical event stream for reading and triage.
 - [ ] Build a horizontal zoomable chronology for reconstruction and correlation.
-- [ ] Synchronize timeline selection with related entities, Map, and Graph.
+- [ ] Synchronize timeline selection with related entities, Map, and Graph. Inspector, Map, Chat, and Graph handoffs are complete; shared timeline selection remains.
 
 ## Graph
 

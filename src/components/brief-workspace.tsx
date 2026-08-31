@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowClockwise, ArrowSquareOut, CaretDown, CaretRight, ChatCircleText, Check, ClockCounterClockwise, DownloadSimple, FloppyDisk, FolderOpen, MapTrifold, PencilSimple, ShareNetwork, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowSquareOut, CaretDown, CaretRight, ChatCircleText, ClockCounterClockwise, DownloadSimple, FloppyDisk, FolderOpen, MapTrifold, PencilSimple, ShareNetwork, X } from "@phosphor-icons/react";
 import { defaultBriefScope, type BriefDevelopment, type BriefRange, type BriefScope } from "@/src/lib/brief";
 import type { OverviewArtifact } from "@/src/lib/server/overview-store";
 import type { WorkspaceSearchCorpus, WorkspaceSearchSelection } from "@/src/components/maplibre-react-spike";
 import type { InspectorRef, WorkspaceLens } from "@/src/lib/workspace-shell-state";
+import { WorkspaceMultiMenu } from "@/src/components/workspace-controls";
 
 type Props = {
   corpus: WorkspaceSearchCorpus;
@@ -141,7 +142,7 @@ export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap
     <div className="brief-scope" aria-label="Brief scope">
       <div className="brief-range">{rangeOptions.map((option) => <button key={option.value} className={scope.range === option.value ? "active" : ""} onClick={() => setScope((current) => ({ ...current, range: option.value }))}>{option.label}</button>)}</div>
       <label><span>Place</span><input value={scope.geography ?? ""} onChange={(event) => setScope((current) => ({ ...current, geography: event.target.value || undefined }))} placeholder="Global" /></label>
-      <details><summary>{scope.domains.length ? `${scope.domains.length} domains` : "All domains"}<CaretDown size={13} /></summary><div>{domains.map((domain) => <button key={domain} onClick={() => setScope((current) => ({ ...current, domains: current.domains.includes(domain) ? current.domains.filter((item) => item !== domain) : [...current.domains, domain] }))}><span>{domain}</span>{scope.domains.includes(domain) && <Check size={12} />}</button>)}</div></details>
+      <WorkspaceMultiMenu ariaLabel="Brief domains" className="brief-domain-menu" emptyLabel="All domains" value={scope.domains} options={domains.map((domain) => ({ value: domain, label: domain }))} onChange={(domainValues) => setScope((current) => ({ ...current, domains: domainValues }))} />
     </div>
     {historyOpen && <aside className="brief-history"><header><b>History</b><button onClick={() => setHistoryOpen(false)} aria-label="Close history"><X size={15} /></button></header>{history.map((item) => <button key={item.id} className={item.id === artifact?.id ? "active" : ""} onClick={() => { setArtifact(item); setScope(item.scope ?? defaultBriefScope); setDraftSummary(item.overview); setHistoryOpen(false); window.localStorage.setItem(viewedKey, item.id); }}><b>{new Date(item.createdAt).toLocaleString()}</b><span>{item.overview}</span></button>)}</aside>}
     {error && <div className="brief-error"><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}
