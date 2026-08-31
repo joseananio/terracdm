@@ -31,7 +31,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  deploy-staging:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'staging') ||
+      (github.event_name == 'push' && github.ref_name == 'staging')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -43,25 +46,42 @@ jobs:
           version: latest
 
       - name: Apply staging migrations
-        if: >-
-          (github.event_name == 'workflow_dispatch' && inputs.target == 'staging') ||
-          (github.event_name == 'push' && github.ref_name == 'staging')
         env:
           SUPABASE_DB_URL: ${{ secrets.STAGING_DB_URL }}
         run: |
+          if [[ -z "$SUPABASE_DB_URL" ]]; then
+            echo "::error::STAGING_DB_URL is not configured"
+            exit 1
+          fi
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
           else
             supabase db push --db-url "$SUPABASE_DB_URL"
           fi
 
+  deploy-production:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'production') ||
+      (github.event_name == 'push' && github.ref_name == 'main')
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+
       - name: Apply production migrations
-        if: >-
-          (github.event_name == 'workflow_dispatch' && inputs.target == 'production') ||
-          (github.event_name == 'push' && github.ref_name == 'main')
         env:
-          SUPABASE_DB_URL: ${{ secrets.PROD_DB_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          if [[ -z "$SUPABASE_DB_URL" ]]; then
+            echo "::error::SUPABASE_DB_URL is not configured in the Production environment"
+            exit 1
+          fi
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
           else
