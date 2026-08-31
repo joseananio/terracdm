@@ -11,6 +11,7 @@ import { WorkspaceMultiMenu } from "@/src/components/workspace-controls";
 type Props = {
   corpus: WorkspaceSearchCorpus;
   onAsk: (prompt: string, development?: BriefDevelopment) => void;
+  onAddToCase: (development: BriefDevelopment, briefId?: string) => void;
   onInspect: (content: InspectorRef) => void;
   onNavigate: (lens: WorkspaceLens) => void;
   onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void;
@@ -19,7 +20,7 @@ type Props = {
 const rangeOptions: Array<{ value: BriefRange; label: string }> = [{ value: "current", label: "Current" }, { value: "6h", label: "6 hours" }, { value: "24h", label: "24 hours" }, { value: "7d", label: "7 days" }];
 const viewedKey = "terracdm:brief:viewed";
 
-export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap }: Props) {
+export function BriefWorkspace({ corpus, onAsk, onAddToCase, onInspect, onNavigate, onViewMap }: Props) {
   const [artifact, setArtifact] = useState<OverviewArtifact | null>(null);
   const [history, setHistory] = useState<OverviewArtifact[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -117,7 +118,7 @@ export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap
   };
 
   const openEvidence = (kind: "signal" | "entity", id: string) => onInspect({ kind, id, sourceLens: "brief" });
-  const handoff = (lens: "graph" | "cases", development: BriefDevelopment) => {
+  const handoff = (lens: "graph", development: BriefDevelopment) => {
     window.localStorage.setItem(`terracdm:${lens}:handoff`, JSON.stringify({ briefId: artifact?.id, development }));
     onNavigate(lens);
   };
@@ -150,7 +151,7 @@ export function BriefWorkspace({ corpus, onAsk, onInspect, onNavigate, onViewMap
       <article className="brief-summary">{editing ? <><textarea value={draftSummary} onChange={(event) => setDraftSummary(event.target.value)} autoFocus /><div><button onClick={() => setEditing(false)}>Cancel</button><button className="primary" onClick={() => void save()} disabled={saving}><FloppyDisk size={14} />{saving ? "Saving" : "Save"}</button></div></> : <p>{artifact.overview}</p>}</article>
       <div className="brief-content"><main><h2>Developments</h2>{developments.map((development) => { const isOpen = expanded.has(development.id); const signalEvidence = development.signalIds.map((id) => corpus.signals.find((item) => item.id === id)).filter(Boolean); const entityEvidence = development.entityIds.map((id) => corpus.entities.find((item) => item.id === id)).filter(Boolean); return <article key={development.id} className={`brief-development ${development.risk}`}>
         <button className="brief-development-toggle" onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(development.id)) next.delete(development.id); else next.add(development.id); return next; })} aria-expanded={isOpen}><i /><span><b>{development.title}</b><small>{development.assessment}</small></span><CaretDown size={16} /></button>
-        {isOpen && <div className="brief-evidence">{development.uncertainty && <p>{development.uncertainty}</p>}{signalEvidence.map((signal) => signal && <button key={signal.id} onClick={() => openEvidence("signal", signal.id)}><span>{signal.name}</span><small>{signal.source.name}</small><CaretRight size={14} /></button>)}{entityEvidence.map((entity) => entity && <button key={entity.id} onClick={() => openEvidence("entity", entity.id)}><span>{entity.name}</span><small>{entity.domain}</small><CaretRight size={14} /></button>)}{!signalEvidence.length && !entityEvidence.length && <span>No linked records in the current snapshot.</span>}<div className="brief-development-actions"><button onClick={() => { const signal = signalEvidence[0]; if (signal) onViewMap({ kind: "signal", value: signal }); }} disabled={!signalEvidence.length}><MapTrifold />Map</button><button onClick={() => handoff("graph", development)}><ShareNetwork />Graph</button><button onClick={() => onAsk(`Investigate: ${development.title}`, development)}><ChatCircleText />Ask</button><button onClick={() => handoff("cases", development)}><FolderOpen />Add to case</button></div></div>}
+        {isOpen && <div className="brief-evidence">{development.uncertainty && <p>{development.uncertainty}</p>}{signalEvidence.map((signal) => signal && <button key={signal.id} onClick={() => openEvidence("signal", signal.id)}><span>{signal.name}</span><small>{signal.source.name}</small><CaretRight size={14} /></button>)}{entityEvidence.map((entity) => entity && <button key={entity.id} onClick={() => openEvidence("entity", entity.id)}><span>{entity.name}</span><small>{entity.domain}</small><CaretRight size={14} /></button>)}{!signalEvidence.length && !entityEvidence.length && <span>No linked records in the current snapshot.</span>}<div className="brief-development-actions"><button onClick={() => { const signal = signalEvidence[0]; if (signal) onViewMap({ kind: "signal", value: signal }); }} disabled={!signalEvidence.length}><MapTrifold />Map</button><button onClick={() => handoff("graph", development)}><ShareNetwork />Graph</button><button onClick={() => onAsk(`Investigate: ${development.title}`, development)}><ChatCircleText />Ask</button><button onClick={() => onAddToCase(development, artifact?.id)}><FolderOpen />Add to case</button></div></div>}
       </article>; })}</main><aside><h2>Ask next</h2>{artifact.suggestedQueries.map((query) => <button key={query} onClick={() => onAsk(query)}><span>{query}</span><ArrowSquareOut size={13} /></button>)}</aside></div>
     </div>}
   </section>;

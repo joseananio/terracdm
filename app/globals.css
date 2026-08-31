@@ -273,6 +273,8 @@
 .workspace-signal-open > svg { color: var(--faint); }
 .workspace-signal-watch { position: absolute; z-index: 2; top: 22px; right: 3px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; color: #3f4c51; background: transparent; }
 .workspace-signal-watch:hover, .workspace-signal-watch.active { color: var(--amber); }
+.workspace-signal-add { position: absolute; z-index: 2; top: 22px; right: 33px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 3px; color: var(--faint); background: transparent; }
+.workspace-signal-add:hover, .workspace-signal-add:focus-visible { color: var(--cyan); background: rgba(86, 215, 255, .08); outline: 0; }
 .workspace-empty-state { min-height: min(54vh, 520px); display: grid; place-content: center; justify-items: center; gap: 13px; color: var(--muted); }
 .workspace-empty-state > span { width: 6px; height: 6px; border: 1px solid rgba(86, 215, 255, .65); transform: rotate(45deg); box-shadow: 0 0 12px rgba(86, 215, 255, .2); }
 .workspace-empty-state p { max-width: 440px; margin: 0; font: 400 10px/1.6 var(--mono); text-align: center; }
@@ -354,6 +356,40 @@
 .case-error button { color: inherit; background: transparent; }
 .case-modal-scrim { position: absolute; z-index: 40; inset: 0; background: rgba(1, 4, 6, .58); backdrop-filter: blur(2px); }
 .case-create { position: absolute; z-index: 41; top: 50%; left: 50%; width: min(520px, calc(100% - 28px)); max-height: calc(100% - 28px); overflow-y: auto; transform: translate(-50%, -50%); border: 1px solid rgba(151, 177, 185, .22); border-radius: 10px; background: #070d10; box-shadow: 0 28px 80px rgba(0, 0, 0, .55); animation: case-create-in .18s ease-out; }
+.case-picker-scrim { position: absolute; z-index: 50; inset: 0; border: 0; background: rgba(1, 4, 6, .68); backdrop-filter: blur(3px); }
+.case-picker { position: absolute; z-index: 51; top: 50%; left: 50%; width: min(560px, calc(100% - 28px)); max-height: min(680px, calc(100% - 28px)); overflow: hidden; transform: translate(-50%, -50%); border: 1px solid rgba(151, 177, 185, .24); border-radius: 10px; background: #070d10; box-shadow: 0 28px 80px rgba(0, 0, 0, .58); animation: case-create-in .18s ease-out; }
+.case-picker > header { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px 0 20px; border-bottom: 1px solid rgba(151, 177, 185, .13); }
+.case-picker h2 { margin: 0; color: var(--text); font: 500 16px var(--sans); }
+.case-picker > header button { display: grid; place-items: center; color: var(--muted); background: transparent; }
+.case-picker-error { margin: 0; padding: 10px 20px; color: var(--amber); background: rgba(255, 184, 107, .06); font: 400 10px var(--mono); }
+.case-picker-add { max-height: calc(100% - 54px); overflow-y: auto; }
+.case-picker-pending { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 20px 2px; }
+.case-picker-pending span { max-width: 100%; overflow: hidden; padding: 6px 8px; color: var(--cyan); background: rgba(86, 215, 255, .07); font: 400 9px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.case-picker-existing, .case-picker-new { padding: 16px 20px; }
+.case-picker-existing { border-bottom: 1px solid rgba(151, 177, 185, .11); }
+.case-picker h3 { margin: 0 0 10px; color: var(--muted); font: 400 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.case-picker-existing > button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border-top: 1px solid rgba(151, 177, 185, .09); color: var(--text); background: transparent; font: 400 11px var(--mono); text-align: left; }
+.case-picker-existing > button:hover, .case-picker-existing > button:focus-visible { background: rgba(86, 215, 255, .05); outline: 0; }
+.case-picker-existing p, .case-picker-results p { margin: 0; color: var(--faint); font: 400 10px var(--mono); }
+.case-picker-new { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.case-picker-new h3 { grid-column: 1 / -1; margin-bottom: -2px; }
+.case-picker-new input { min-width: 0; height: 40px; padding: 0 10px; border: 0; outline: 0; color: var(--text); background: rgba(231, 242, 246, .045); font: 400 11px var(--mono); }
+.case-picker-new input:focus { background: rgba(86, 215, 255, .065); box-shadow: inset 0 -1px var(--cyan); }
+.case-picker-new > button, .case-picker-done { height: 40px; padding: 0 14px; color: #031015; background: var(--cyan); font: 500 10px var(--mono); }
+.case-picker-new > button:disabled { opacity: .35; }
+.case-picker-evidence { max-height: calc(100% - 54px); display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 20px; }
+.case-picker-search { height: 42px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 9px; padding: 0 12px; color: var(--muted); background: rgba(231, 242, 246, .045); }
+.case-picker-search input { min-width: 0; border: 0; outline: 0; color: var(--text); background: transparent; font: 400 11px var(--mono); }
+.case-picker-results { min-height: 120px; overflow-y: auto; border: 1px solid rgba(151, 177, 185, .12); }
+.case-picker-results > button { width: 100%; min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-top: 1px solid rgba(151, 177, 185, .09); color: var(--text); background: transparent; text-align: left; }
+.case-picker-results > button:first-child { border-top: 0; }
+.case-picker-results > button:hover, .case-picker-results > button:focus-visible { background: rgba(86, 215, 255, .05); outline: 0; }
+.case-picker-results > button:disabled { opacity: .5; }
+.case-picker-results > button span { min-width: 0; display: grid; gap: 4px; }
+.case-picker-results b { overflow: hidden; font: 400 11px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.case-picker-results small { overflow: hidden; color: var(--muted); font: 400 9px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.case-picker-results em { flex: 0 0 auto; color: var(--faint); font: 400 8px var(--mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
+.case-picker-done { align-self: flex-end; }
 @keyframes case-create-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } }
 .case-create > header { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 18px; border-bottom: 1px solid rgba(151, 177, 185, .12); }
 .case-create h2 { margin: 0; font: 500 16px var(--sans); }

@@ -9,14 +9,21 @@ import { WorkspaceSelect } from "@/src/components/workspace-controls";
 import type { InspectorRef, WorkspaceLens } from "@/src/lib/workspace-shell-state";
 
 type CaseTab = "summary" | "timeline" | "evidence" | "relationships" | "notes";
-type CaseHandoff = { briefId?: string; development?: BriefDevelopment } | { kind: "signal" | "entity"; id: string };
+type CaseHandoff = { briefId?: string; development?: BriefDevelopment; targetCaseId?: string } | { kind: "signal" | "entity"; id: string; targetCaseId?: string };
+
+export type CasePickerRequest =
+  | { kind: "record"; content: InspectorRef }
+  | { kind: "development"; development: BriefDevelopment; briefId?: string }
+  | { kind: "evidence"; caseId: string };
 
 type Props = {
   corpus: WorkspaceSearchCorpus;
+  onAddEvidence: (caseId: string) => void;
   onInspect: (content: InspectorRef) => void;
   onNavigate: (lens: WorkspaceLens) => void;
   onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void;
   handoffToken: number;
+  refreshToken?: number;
 };
 
 const statusOptions: Array<{ value: CaseStatus; label: string }> = [{ value: "active", label: "Active" }, { value: "watching", label: "Watching" }, { value: "closed", label: "Closed" }];
@@ -53,7 +60,95 @@ function handoffItems(handoff: CaseHandoff | null, corpus: WorkspaceSearchCorpus
   return record ? [{ id: crypto.randomUUID(), kind: handoff.kind, objectId: record.id, name: record.name, description: record.description, role: "context", addedAt: now }] : [];
 }
 
-export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, onViewMap }: Props) {
+function pickerItems(request: Exclude<CasePickerRequest, { kind: "evidence" }> | null, corpus: WorkspaceSearchCorpus) {
+  if (!request) return [];
+  if (request.kind === "record") {
+    if (request.content.kind !== "signal" && request.content.kind !== "entity") return [];
+    return handoffItems({ kind: request.content.kind, id: request.content.id }, corpus);
+  }
+  return handoffItems({ briefId: request.briefId, development: request.development }, corpus);
+}
+
+export function CasePickerDialog({ corpus, onClose, onComplete, request }: { corpus: WorkspaceSearchCorpus; onClose: () => void; onComplete: () => void; request: CasePickerRequest }) {
+  const [cases, setCases] = useState<IntelligenceCase[]>([]);
+  const [query, setQuery] = useState("");
+  const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const additions = useMemo(() => pickerItems(request.kind === "evidence" ? null : request, corpus), [corpus, request]);
+  const searchSignals = useMemo(() => corpus.signals.filter((signal) => matchesCaseSearch(query, signal.name, signal.description, signal.domain, signal.source.name)).slice(0, 8), [corpus.signals, query]);
+  const searchEntities = useMemo(() => corpus.entities.filter((entity) => matchesCaseSearch(query, entity.name, entity.description, entity.domain)).slice(0, 8), [corpus.entities, query]);
+  const target = request.kind === "evidence" ? cases.find((item) => item.id === request.caseId) : null;
+  const hasEvidence = (kind: "signal" | "entity", id: string) => addedIds.has(`${kind}:${id}`) || Boolean(target?.items.some((item) => item.kind === kind && item.objectId === id));
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/cases", { cache: "no-store" }).then(async (response) => {
+      const payload = await response.json() as { cases?: IntelligenceCase[]; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Cases could not be loaded");
+      if (active) setCases(payload.cases ?? []);
+    }).catch((cause) => active && setError(cause instanceof Error ? cause.message : "Cases could not be loaded"));
+    return () => { active = false; };
+  }, []);
+
+  const patch = async (value: IntelligenceCase, items: CaseItem[]) => {
+    const now = new Date().toISOString();
+    const additionsOnly = items.filter((incoming) => !value.items.some((item) => item.kind === incoming.kind && item.objectId === incoming.objectId));
+    if (!additionsOnly.length) return value;
+    const response = await fetch("/api/cases", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: value.id, patch: { items: [...value.items, ...additionsOnly], events: [...additionsOnly.map((item): CaseEvent => ({ id: crypto.randomUUID(), type: "evidence", text: `Added ${item.name}`, objectKind: item.kind === "brief" ? undefined : item.kind, objectId: item.kind === "brief" ? undefined : item.objectId, createdAt: now })), ...value.events] } }) });
+    const payload = await response.json() as { case?: IntelligenceCase; error?: string };
+    if (!response.ok || !payload.case) throw new Error(payload.error ?? "Case could not be updated");
+    setCases((current) => current.map((item) => item.id === value.id ? payload.case! : item));
+    return payload.case;
+  };
+
+  const addToExisting = async (value: IntelligenceCase) => {
+    if (saving) return;
+    setSaving(true); setError(null);
+    try { await patch(value, additions); onComplete(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Case could not be updated"); }
+    finally { setSaving(false); }
+  };
+
+  const create = async () => {
+    if (!title.trim() || saving) return;
+    setSaving(true); setError(null);
+    try {
+      const response = await fetch("/api/cases", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: title.trim(), items: additions }) });
+      const payload = await response.json() as { case?: IntelligenceCase; error?: string };
+      if (!response.ok || !payload.case) throw new Error(payload.error ?? "Case could not be created");
+      onComplete();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Case could not be created"); }
+    finally { setSaving(false); }
+  };
+
+  const addEvidence = async (kind: "signal" | "entity", id: string) => {
+    if (!target || saving || hasEvidence(kind, id)) return;
+    const record = kind === "signal" ? corpus.signals.find((item) => item.id === id) : corpus.entities.find((item) => item.id === id);
+    if (!record) return;
+    setSaving(true); setError(null);
+    try {
+      const item: CaseItem = { id: crypto.randomUUID(), kind, objectId: record.id, name: record.name, description: record.description, role: "context", addedAt: new Date().toISOString() };
+      const next = await patch(target, [item]);
+      setAddedIds((current) => new Set(current).add(`${kind}:${id}`));
+      if (next.items.some((value) => value.kind === kind && value.objectId === id)) setCases((current) => current.map((value) => value.id === next.id ? next : value));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Evidence could not be added"); }
+    finally { setSaving(false); }
+  };
+
+  const titleText = request.kind === "evidence" ? `Add evidence · ${target?.title ?? "Case"}` : request.kind === "development" ? "Add development to case" : "Add to case";
+  return <><button className="case-picker-scrim" onClick={onClose} aria-label="Close case picker" /><aside className="case-picker" role="dialog" aria-modal="true" aria-labelledby="case-picker-title"><header><h2 id="case-picker-title">{titleText}</h2><button type="button" onClick={onClose} aria-label="Close"><X size={16} /></button></header>{error && <p className="case-picker-error">{error}</p>}{request.kind === "evidence" ? <div className="case-picker-evidence"><label className="case-picker-search"><MagnifyingGlass size={14} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search signals and entities" /></label><div className="case-picker-results">{searchSignals.map((signal) => <button type="button" key={`signal:${signal.id}`} onClick={() => void addEvidence("signal", signal.id)} disabled={saving || hasEvidence("signal", signal.id)}><span><b>{signal.name}</b><small>{signal.description || signal.domain}</small></span><em>{hasEvidence("signal", signal.id) ? "Added" : "Signal"}</em></button>)}{searchEntities.map((entity) => <button type="button" key={`entity:${entity.id}`} onClick={() => void addEvidence("entity", entity.id)} disabled={saving || hasEvidence("entity", entity.id)}><span><b>{entity.name}</b><small>{entity.description || entity.domain}</small></span><em>{hasEvidence("entity", entity.id) ? "Added" : "Entity"}</em></button>)}{!searchSignals.length && !searchEntities.length && <p>No matching records.</p>}</div><button type="button" className="case-picker-done" onClick={onComplete}>Done</button></div> : <div className="case-picker-add"><div className="case-picker-pending">{additions.map((item) => <span key={`${item.kind}:${item.objectId}`}>{item.name}</span>)}</div><div className="case-picker-existing"><h3>Existing cases</h3>{cases.filter((item) => item.status !== "closed").map((item) => <button type="button" key={item.id} onClick={() => void addToExisting(item)} disabled={saving}><span>{item.title}</span><CaretRight size={14} /></button>)}{!cases.some((item) => item.status !== "closed") && <p>No active cases yet.</p>}</div><div className="case-picker-new"><h3>New case</h3><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void create(); }} placeholder="Case title" aria-label="New case title" /><button type="button" onClick={() => void create()} disabled={!title.trim() || saving}>Create case</button></div></div>}</aside></>;
+}
+
+function matchesCaseSearch(query: string, ...values: Array<string | undefined>) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const text = values.filter(Boolean).join(" ").toLowerCase();
+  return terms.every((term) => text.includes(term));
+}
+
+export function CasesWorkspace({ corpus, handoffToken, onAddEvidence, onInspect, onNavigate, onViewMap, refreshToken }: Props) {
   const [cases, setCases] = useState<IntelligenceCase[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<CaseTab>("summary");
@@ -67,6 +162,7 @@ export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, on
   const [assessmentDraft, setAssessmentDraft] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [targetCaseId, setTargetCaseId] = useState<string | null>(null);
   const selected = cases.find((item) => item.id === selectedId) ?? null;
 
   const refresh = async () => {
@@ -83,10 +179,15 @@ export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, on
   }, []);
 
   useEffect(() => {
+    if (refreshToken === undefined) return;
+    void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : "Cases could not be loaded"));
+  }, [refreshToken]);
+
+  useEffect(() => {
     const raw = window.localStorage.getItem("terracdm:cases:handoff");
     if (!raw) return;
     window.localStorage.removeItem("terracdm:cases:handoff");
-    try { setHandoff(JSON.parse(raw) as CaseHandoff); setSelectedId(null); setAssessmentDraft(""); setCreateOpen(true); } catch { /* Ignore malformed handoffs. */ }
+    try { const parsed = JSON.parse(raw) as CaseHandoff; setHandoff(parsed); setTargetCaseId(parsed.targetCaseId ?? null); setSelectedId(null); setAssessmentDraft(""); setCreateOpen(true); } catch { /* Ignore malformed handoffs. */ }
   }, [handoffToken]);
 
   const visible = useMemo(() => cases.filter((item) => filter === "all" || item.status === filter).filter((item) => !query.trim() || `${item.title} ${item.summary} ${item.assessment}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), [cases, filter, query]);
@@ -100,7 +201,7 @@ export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, on
       const response = await fetch("/api/cases", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
       const payload = await response.json() as { case?: IntelligenceCase; error?: string };
       if (!response.ok || !payload.case) throw new Error(payload.error ?? "Case could not be created");
-      setCases((current) => [payload.case!, ...current]); setSelectedId(payload.case.id); setCreateOpen(false); setTitle(""); setAssessmentDraft(payload.case.assessment); setHandoff(null);
+      setCases((current) => [payload.case!, ...current]); setSelectedId(payload.case.id); setCreateOpen(false); setTitle(""); setAssessmentDraft(payload.case.assessment); setHandoff(null); setTargetCaseId(null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Case could not be created"); }
     finally { setSaving(false); }
   };
@@ -128,6 +229,14 @@ export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, on
     if (!saved) return;
     setHandoff(null); setCreateOpen(false); setSelectedId(value.id); setAssessmentDraft(value.assessment);
   };
+
+  useEffect(() => {
+    if (!targetCaseId || !createOpen || !pendingItems.length) return;
+    const target = cases.find((item) => item.id === targetCaseId && item.status !== "closed");
+    if (!target) return;
+    setTargetCaseId(null);
+    void addPendingTo(target);
+  }, [cases, createOpen, pendingItems, targetCaseId]);
 
   const saveAssessment = async () => {
     if (!selected) return;
@@ -177,7 +286,7 @@ export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, on
   };
 
   if (selected) return <section className="workspace-foundation cases-workspace case-detail" aria-labelledby="case-title">
-    <header className="case-detail-head"><button onClick={() => setSelectedId(null)} aria-label="Back to cases"><ArrowLeft size={17} /></button><div><h1 id="case-title">{selected.title}</h1><WorkspaceSelect ariaLabel="Case status" value={selected.status} options={statusOptions} onChange={(status) => void patchCase(selected, { status, events: [{ id: crypto.randomUUID(), type: "status", text: `Status changed to ${status}`, changes: { field: "status", from: selected.status, to: status }, createdAt: new Date().toISOString() }, ...selected.events] })} /></div><div className="case-detail-actions"><div className="case-detail-indicators"><div className="case-detail-indicator"><span>Risk</span><WorkspaceSelect ariaLabel="Case risk level" value={selected.risk} options={riskOptions} onChange={(risk) => void setAssessmentLevel("risk", risk)} /></div></div><button onClick={viewCaseOnMap} disabled={!mapItem}><MapTrifold size={16} />Map</button><button onClick={() => { window.localStorage.setItem("terracdm:graph:handoff", JSON.stringify({ caseId: selected.id, itemIds: selected.items.map((item) => item.objectId) })); onNavigate("graph"); }}><ShareNetwork size={16} />Graph</button></div></header>
+    <header className="case-detail-head"><button onClick={() => setSelectedId(null)} aria-label="Back to cases"><ArrowLeft size={17} /></button><div><h1 id="case-title">{selected.title}</h1><WorkspaceSelect ariaLabel="Case status" value={selected.status} options={statusOptions} onChange={(status) => void patchCase(selected, { status, events: [{ id: crypto.randomUUID(), type: "status", text: `Status changed to ${status}`, changes: { field: "status", from: selected.status, to: status }, createdAt: new Date().toISOString() }, ...selected.events] })} /></div><div className="case-detail-actions"><div className="case-detail-indicators"><div className="case-detail-indicator"><span>Risk</span><WorkspaceSelect ariaLabel="Case risk level" value={selected.risk} options={riskOptions} onChange={(risk) => void setAssessmentLevel("risk", risk)} /></div></div><button onClick={() => onAddEvidence(selected.id)}><FolderOpen size={16} />Add evidence</button><button onClick={viewCaseOnMap} disabled={!mapItem}><MapTrifold size={16} />Map</button><button onClick={() => { window.localStorage.setItem("terracdm:graph:handoff", JSON.stringify({ caseId: selected.id, itemIds: selected.items.map((item) => item.objectId) })); onNavigate("graph"); }}><ShareNetwork size={16} />Graph</button></div></header>
     <nav className="case-tabs" aria-label="Case sections">{(["summary", "timeline", "evidence", "relationships", "notes"] as CaseTab[]).map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>)}</nav>
     {error && <div className="case-error"><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}
     <div className="case-detail-scroll">
@@ -190,7 +299,7 @@ export function CasesWorkspace({ corpus, handoffToken, onInspect, onNavigate, on
   </section>;
 
   return <section className="workspace-foundation cases-workspace" aria-labelledby="cases-title">
-    <header className="workspace-foundation-head cases-head"><div><h1 id="cases-title">Cases</h1><span>{cases.filter((item) => item.status !== "closed").length} open</span></div><button onClick={() => { setHandoff(null); setCreateOpen(true); }}><Plus size={16} />New case</button></header>
+    <header className="workspace-foundation-head cases-head"><div><h1 id="cases-title">Cases</h1><span>{cases.filter((item) => item.status !== "closed").length} open</span></div><button onClick={() => { setHandoff(null); setTargetCaseId(null); setCreateOpen(true); }}><Plus size={16} />New case</button></header>
     <div className="cases-controls"><nav>{(["all", "active", "watching", "closed"] as const).map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</nav><label><MagnifyingGlass size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter cases" />{query && <button onClick={() => setQuery("")} aria-label="Clear case filter"><X /></button>}</label></div>
     {error && <div className="case-error"><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}
     {loading ? <div className="case-empty">Loading cases…</div> : visible.length ? <div className="cases-list">{visible.map((item) => <button key={item.id} onClick={() => { setSelectedId(item.id); setAssessmentDraft(item.assessment); }}><span className={`case-risk ${item.risk}`} /><span><b>{item.title}</b><small>{item.items.filter((entry) => entry.kind === "signal").length} signals · {item.items.filter((entry) => entry.kind === "entity").length} entities</small></span><em>{item.status}</em><time>{relativeTime(item.updatedAt)}</time><CaretRight size={15} /></button>)}</div> : <div className="case-empty"><FolderOpen size={23} /><p>No cases in this view.</p></div>}

@@ -25,7 +25,7 @@ import {
 import { MaplibreReactSpike, type WorkspaceMapSettingsRequest, type WorkspaceMapSettingsState, type WorkspaceSearchCorpus, type WorkspaceSearchSelection, type WorkspaceToolRequest, type WorkspaceToolState } from "@/src/components/maplibre-react-spike";
 import { SignalIcon } from "@/src/components/incoming-signal-queue";
 import { WorkspaceMenu, WorkspaceSelect } from "@/src/components/workspace-controls";
-import { CasesWorkspace } from "@/src/components/cases-workspace";
+import { CasePickerDialog, CasesWorkspace, type CasePickerRequest } from "@/src/components/cases-workspace";
 import type { BriefDevelopment } from "@/src/lib/brief";
 import type { ChatReference } from "@/src/lib/server/chat";
 import type { FeedStatus } from "@/src/lib/feed-status";
@@ -169,7 +169,7 @@ function signalAge(value: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function SignalWorkspace({ onInspect, signals }: { onInspect: (content: InspectorRef) => void; signals: Signal[] }) {
+function SignalWorkspace({ onAddToCase, onInspect, signals }: { onAddToCase: (content: InspectorRef) => void; onInspect: (content: InspectorRef) => void; signals: Signal[] }) {
   const [filter, setFilter] = useState<SignalFilter>("all");
   const [sort, setSort] = useState<SignalSort>("newest");
   const [query, setQuery] = useState("");
@@ -219,13 +219,14 @@ function SignalWorkspace({ onInspect, signals }: { onInspect: (content: Inspecto
           <time dateTime={signal.observedAt} title={new Date(signal.observedAt).toLocaleString()}>{signalAge(signal.observedAt)}</time>
           <CaretRight size={14} />
         </button>
+        <button type="button" className="workspace-signal-add" onClick={() => onAddToCase({ kind: "signal", id: signal.id, sourceLens: "signals" })} aria-label={`Add ${signal.name} to case`} title="Add to case"><FolderOpen size={14} /></button>
         <button type="button" className={watched ? "workspace-signal-watch active" : "workspace-signal-watch"} onClick={() => toggleWatch(signal.id)} aria-label={watched ? `Remove ${signal.name} from watchlist` : `Add ${signal.name} to watchlist`} aria-pressed={watched}><Star size={14} weight={watched ? "fill" : "regular"} /></button>
       </article>;
     })}</div> : <div className="workspace-empty-state"><span aria-hidden="true" /><p>No signals match this view.</p></div>}
   </section>;
 }
 
-function EntityWorkspace({ entities, onInspect }: { entities: Entity[]; onInspect: (content: InspectorRef) => void }) {
+function EntityWorkspace({ entities, onAddToCase, onInspect }: { entities: Entity[]; onAddToCase: (content: InspectorRef) => void; onInspect: (content: InspectorRef) => void }) {
   const [filter, setFilter] = useState<EntityFilter>("all");
   const [sort, setSort] = useState<EntitySort>("newest");
   const [query, setQuery] = useState("");
@@ -272,6 +273,7 @@ function EntityWorkspace({ entities, onInspect }: { entities: Entity[]; onInspec
           <time dateTime={entity.observedAt} title={new Date(entity.observedAt).toLocaleString()}>{signalAge(entity.observedAt)}</time>
           <CaretRight size={14} />
         </button>
+        <button type="button" className="workspace-signal-add" onClick={() => onAddToCase({ kind: "entity", id: entity.id, sourceLens: "entities" })} aria-label={`Add ${entity.name} to case`} title="Add to case"><FolderOpen size={14} /></button>
         <button type="button" className={watched ? "workspace-signal-watch active" : "workspace-signal-watch"} onClick={() => toggleWatch(entity.id)} aria-label={watched ? `Remove ${entity.name} from watchlist` : `Add ${entity.name} to watchlist`} aria-pressed={watched}><Star size={14} weight={watched ? "fill" : "regular"} /></button>
       </article>;
     })}</div> : <div className="workspace-empty-state"><span aria-hidden="true" /><p>No entities match this view.</p></div>}
@@ -333,6 +335,8 @@ export function WorkspaceShell() {
   const [workspaceToolState, setWorkspaceToolState] = useState<WorkspaceToolState>({ chatOpen: false, actionsOpen: false });
   const [briefUnread, setBriefUnread] = useState(false);
   const [caseHandoffToken, setCaseHandoffToken] = useState(0);
+  const [casePickerRequest, setCasePickerRequest] = useState<CasePickerRequest | null>(null);
+  const [caseDataVersion, setCaseDataVersion] = useState(0);
   const [mapSettingsState, setMapSettingsState] = useState<WorkspaceMapSettingsState>({ settings: defaultMapSettings, ready: false });
   const [mapSettingsRequest, setMapSettingsRequest] = useState<WorkspaceMapSettingsRequest | null>(null);
   const [renderedSplitContent, setRenderedSplitContent] = useState<InspectorRef | null>(null);
@@ -341,7 +345,9 @@ export function WorkspaceShell() {
   const splitDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [shellReady, setShellReady] = useState(false);
   const mode = shell.activeLens;
-  const setMode = (lens: WorkspaceMode) => dispatch({ type: "open-lens", lens });
+  const setMode = (lens: WorkspaceMode) => {
+    dispatch({ type: "open-lens", lens });
+  };
 
   useEffect(() => {
     const splitWidth = Number(window.localStorage.getItem("terracdm:workspace:split-width"));
@@ -446,10 +452,16 @@ export function WorkspaceShell() {
   };
 
   const openCaseHandoff = (content: InspectorRef) => {
-    window.localStorage.setItem("terracdm:cases:handoff", JSON.stringify({ kind: content.kind, id: content.id }));
-    dispatch({ type: "close-inspector" });
-    setCaseHandoffToken((token) => token + 1);
-    setMode("cases");
+    setCasePickerRequest({ kind: "record", content });
+  };
+
+  const beginCaseEvidence = (caseId: string) => {
+    setCasePickerRequest({ kind: "evidence", caseId });
+  };
+
+  const completeCasePicker = () => {
+    setCasePickerRequest(null);
+    setCaseDataVersion((version) => version + 1);
   };
 
   const navigateFromBrief = (lens: WorkspaceLens) => {
@@ -502,13 +514,14 @@ export function WorkspaceShell() {
       <div className="workspace-stage">
         <div className="workspace-lens-stage">
           <div className={`workspace-map-stage${mode === "map" ? " active" : ""}`} aria-hidden={mode !== "map"} {...(mode !== "map" ? { inert: true } : {})}><MaplibreReactSpike mapSettingsRequest={mapSettingsRequest} onFeedStatusChange={setFeedStatus} onMapSettingsStateChange={setMapSettingsState} onOpenSignalsWorkspace={() => setMode("signals")} onSearchCorpusChange={setSearchCorpus} onWorkspaceToolStateChange={setWorkspaceToolState} searchSelection={searchSelection} workspaceToolRequest={workspaceToolRequest} /></div>
-          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : <ModeFoundation mode={lens} />}</div>)}
+          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onAddToCase={(development, briefId) => { setCasePickerRequest({ kind: "development", development, briefId }); }} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} refreshToken={caseDataVersion} onAddEvidence={beginCaseEvidence} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : <ModeFoundation mode={lens} />}</div>)}
           {shell.visitedLenses.includes("settings") && <div className={`workspace-lens${mode === "settings" ? " active" : ""}`} aria-hidden={mode !== "settings"} {...(mode !== "settings" ? { inert: true } : {})}><SettingsWorkspace {...mapSettingsState} onChange={updateMapSettings} /></div>}
           {shell.inspector?.presentation === "overlay" && <><button type="button" className="workspace-inspector-scrim" onClick={() => dispatch({ type: "close-inspector" })} aria-label="Close inspector" /><InspectorPanel content={shell.inspector.content} corpus={searchCorpus} presentation="overlay" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} /></>}
         </div>
       </div>
       </div>
       <div className={`workspace-split${splitExiting ? " exiting" : ""}`} aria-hidden={!splitOpen}><button type="button" className="workspace-split-handle" onPointerDown={beginSplitResize} onPointerMove={resizeSplit} onPointerUp={() => { splitDragRef.current = null; }} aria-label="Resize inspector" tabIndex={splitOpen ? 0 : -1} />{renderedSplitContent && <InspectorPanel content={renderedSplitContent} corpus={searchCorpus} presentation="split" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} />}</div>
+      {casePickerRequest && <CasePickerDialog corpus={searchCorpus} request={casePickerRequest} onClose={() => setCasePickerRequest(null)} onComplete={completeCasePicker} />}
     </main>
   );
 }

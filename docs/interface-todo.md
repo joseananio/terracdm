@@ -65,7 +65,7 @@ This tracks the original signal-first interface plan against the current impleme
 - [x] Add the Cases lens shell.
 - [x] Define the Case data model, persistence, workspace ownership, and status lifecycle.
 - [ ] Create cases manually and cluster signals into cases automatically where appropriate. Manual creation is complete; automatic clustering remains.
-- [ ] Add Add to case from Signals, Entities, search results, and inspectors. Brief and inspector handoffs are complete; direct list and search-result actions remain.
+- [x] Add Add to case from Signals, Entities, inspectors, and Brief without leaving the current view. Search results intentionally open the item first.
 - [ ] Build the Case workspace with summary, signals, entities, evidence, relationships, media, notes, and actions. The core workspace is complete; media remains.
 - [x] Build a vertical event stream for reading and triage.
 - [ ] Build a horizontal zoomable chronology for reconstruction and correlation.
