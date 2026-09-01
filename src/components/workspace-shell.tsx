@@ -34,7 +34,7 @@ import { geosearchKindLabel, type GeosearchResult } from "@/src/lib/geosearch";
 import type { Entity, Signal } from "@/src/lib/intelligence";
 import { subscribeToOverview } from "@/src/lib/client/realtime";
 import { defaultMapSettings, timeZoneOptions, type MapSettings, type MapTimeZone, type TimeFormat } from "@/src/lib/map-settings";
-import { defaultWorkspaceShellState, readWorkspaceLocation, workspaceLenses, workspaceShellReducer, writeWorkspaceLocation, type InspectorRef, type WorkspaceLens } from "@/src/lib/workspace-shell-state";
+import { defaultWorkspaceShellState, readWorkspaceLocation, workspaceLenses, workspaceShellReducer, writeWorkspaceLocation, type InspectorRef, type WorkspaceLens, type WorkspaceSelectionContext } from "@/src/lib/workspace-shell-state";
 
 const BriefWorkspace = dynamic(() => import("@/src/components/brief-workspace").then((module) => module.BriefWorkspace), { ssr: false });
 
@@ -171,12 +171,20 @@ function signalAge(value: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function SignalWorkspace({ onAddToCase, onInspect, signals }: { onAddToCase: (content: InspectorRef) => void; onInspect: (content: InspectorRef) => void; signals: Signal[] }) {
+function SignalWorkspace({ onAddToCase, onInspect, restoreContext, signals }: { onAddToCase: (content: InspectorRef) => void; onInspect: (content: InspectorRef, context?: WorkspaceSelectionContext) => void; restoreContext?: WorkspaceSelectionContext; signals: Signal[] }) {
   const [filter, setFilter] = useState<SignalFilter>("all");
   const [sort, setSort] = useState<SignalSort>("newest");
   const [query, setQuery] = useState("");
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [watchedIds, setWatchedIds] = useState<Set<string>>(() => new Set());
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (restoreContext?.lens !== "signals") return;
+    setQuery(restoreContext.query ?? "");
+    if (restoreContext.filter && ["all", "high", "unread", "watchlist"].includes(restoreContext.filter)) setFilter(restoreContext.filter as SignalFilter);
+    if (restoreContext.sort && ["newest", "risk"].includes(restoreContext.sort)) setSort(restoreContext.sort as SignalSort);
+    if (typeof restoreContext.scrollTop === "number") requestAnimationFrame(() => { if (listRef.current) listRef.current.scrollTop = restoreContext.scrollTop!; });
+  }, [restoreContext]);
   const visibleSignals = useMemo(() => signals
     .filter((signal) => filter !== "high" || signal.risk === "high")
     .filter((signal) => filter !== "unread" || !readIds.has(signal.id))
@@ -186,7 +194,7 @@ function SignalWorkspace({ onAddToCase, onInspect, signals }: { onAddToCase: (co
   const unreadCount = signals.filter((signal) => !readIds.has(signal.id)).length;
   const openSignal = (signal: Signal) => {
     setReadIds((current) => new Set(current).add(signal.id));
-    onInspect({ kind: "signal", id: signal.id, sourceLens: "signals" });
+    onInspect({ kind: "signal", id: signal.id, sourceLens: "signals" }, { lens: "signals", query, filter, sort, scrollTop: listRef.current?.scrollTop ?? 0 });
   };
   const toggleWatch = (signalId: string) => setWatchedIds((current) => {
     const next = new Set(current);
@@ -209,7 +217,7 @@ function SignalWorkspace({ onAddToCase, onInspect, signals }: { onAddToCase: (co
       <WorkspaceMenu className="workspace-signals-sort" ariaLabel="Sort signals" value={sort} onChange={setSort} options={[{ value: "newest", label: "Newest" }, { value: "risk", label: "Highest risk" }]} />
     </div>
     <div className="workspace-signal-columns" aria-hidden="true"><span>Signal</span><span>Domain</span><span>Source</span><span>Observed</span><span /></div>
-    {visibleSignals.length > 0 ? <div className="workspace-signal-list">{visibleSignals.map((signal) => {
+    {visibleSignals.length > 0 ? <div ref={listRef} className="workspace-signal-list">{visibleSignals.map((signal) => {
       const unread = !readIds.has(signal.id);
       const watched = watchedIds.has(signal.id);
       return <article key={signal.id} className={`workspace-signal-row${unread ? " unread" : ""}`}>
@@ -228,11 +236,19 @@ function SignalWorkspace({ onAddToCase, onInspect, signals }: { onAddToCase: (co
   </section>;
 }
 
-function EntityWorkspace({ entities, onAddToCase, onInspect }: { entities: Entity[]; onAddToCase: (content: InspectorRef) => void; onInspect: (content: InspectorRef) => void }) {
+function EntityWorkspace({ entities, onAddToCase, onInspect, restoreContext }: { entities: Entity[]; onAddToCase: (content: InspectorRef) => void; onInspect: (content: InspectorRef, context?: WorkspaceSelectionContext) => void; restoreContext?: WorkspaceSelectionContext }) {
   const [filter, setFilter] = useState<EntityFilter>("all");
   const [sort, setSort] = useState<EntitySort>("newest");
   const [query, setQuery] = useState("");
   const [watchedIds, setWatchedIds] = useState<Set<string>>(() => new Set());
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (restoreContext?.lens !== "entities") return;
+    setQuery(restoreContext.query ?? "");
+    if (restoreContext.filter && ["all", "high", "located", "watchlist"].includes(restoreContext.filter)) setFilter(restoreContext.filter as EntityFilter);
+    if (restoreContext.sort && ["newest", "risk", "name"].includes(restoreContext.sort)) setSort(restoreContext.sort as EntitySort);
+    if (typeof restoreContext.scrollTop === "number") requestAnimationFrame(() => { if (listRef.current) listRef.current.scrollTop = restoreContext.scrollTop!; });
+  }, [restoreContext]);
   const visibleEntities = useMemo(() => entities
     .filter((entity) => filter !== "high" || entity.risk === "high")
     .filter((entity) => filter !== "located" || Boolean(entity.location?.label))
@@ -264,10 +280,10 @@ function EntityWorkspace({ entities, onAddToCase, onInspect }: { entities: Entit
       <WorkspaceMenu className="workspace-signals-sort" ariaLabel="Sort entities" value={sort} onChange={setSort} options={[{ value: "newest", label: "Newest" }, { value: "risk", label: "Highest risk" }, { value: "name", label: "Name" }]} />
     </div>
     <div className="workspace-signal-columns" aria-hidden="true"><span>Entity</span><span>Domain</span><span>Location</span><span>Observed</span><span /></div>
-    {visibleEntities.length > 0 ? <div className="workspace-signal-list">{visibleEntities.map((entity) => {
+    {visibleEntities.length > 0 ? <div ref={listRef} className="workspace-signal-list">{visibleEntities.map((entity) => {
       const watched = watchedIds.has(entity.id);
       return <article key={entity.id} className="workspace-signal-row entity">
-        <button type="button" className="workspace-signal-open" onClick={() => onInspect({ kind: "entity", id: entity.id, sourceLens: "entities" })}>
+        <button type="button" className="workspace-signal-open" onClick={() => onInspect({ kind: "entity", id: entity.id, sourceLens: "entities" }, { lens: "entities", query, filter, sort, scrollTop: listRef.current?.scrollTop ?? 0 })}>
           <span className={`workspace-signal-risk ${entity.risk}`}><SignalIcon domain={entity.domain} /></span>
           <span className="workspace-signal-copy"><b>{entity.name}</b><small>{entity.description || entity.location.label || "No description available."}</small></span>
           <span className="workspace-signal-domain">{entity.domain}</span>
@@ -361,6 +377,9 @@ export function WorkspaceShell() {
   const mode = shell.activeLens;
   const setMode = (lens: WorkspaceMode) => {
     dispatch({ type: "open-lens", lens });
+  };
+  const openInspector = (content: InspectorRef, returnContext?: WorkspaceSelectionContext) => {
+    dispatch({ type: "open-inspector", content: { ...content, returnContext: returnContext ?? content.returnContext ?? { lens: content.sourceLens } } });
   };
 
   useEffect(() => {
@@ -461,7 +480,7 @@ export function WorkspaceShell() {
       setMode("map");
       setSearchSelection({ ...selection, token: Date.now() } as WorkspaceSearchSelection);
     } else {
-      dispatch({ type: "open-inspector", content: { kind: selection.kind, id: selection.value.id, sourceLens: mode } });
+      openInspector({ kind: selection.kind, id: selection.value.id, sourceLens: mode }, { lens: mode, query: searchQuery });
     }
     setSearchQuery("");
     setSearchOpen(false);
@@ -590,7 +609,7 @@ export function WorkspaceShell() {
       <div className="workspace-stage">
         <div className="workspace-lens-stage">
           <div className={`workspace-map-stage${mode === "map" ? " active" : ""}`} aria-hidden={mode !== "map"} {...(mode !== "map" ? { inert: true } : {})}><MapWorkspace mapSettingsRequest={mapSettingsRequest} onFeedStatusChange={setFeedStatus} onMapSettingsStateChange={setMapSettingsState} onOpenGraph={viewEntityOnGraph} onOpenSignalsWorkspace={() => setMode("signals")} onSearchCorpusChange={setSearchCorpus} onWorkspaceToolStateChange={setWorkspaceToolState} searchSelection={searchSelection} workspaceToolRequest={workspaceToolRequest} /></div>
-          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onAddToCase={(development, briefId) => { setCasePickerRequest({ kind: "development", development, briefId }); }} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} refreshToken={caseDataVersion} onAddEvidence={beginCaseEvidence} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : lens === "graph" ? <GraphWorkspace corpus={searchCorpus} focusId={graphFocusId} focusToken={graphFocusToken} expandId={graphExpandId} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : <ModeFoundation mode={lens} />}</div>)}
+          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace restoreContext={shell.inspector?.content.returnContext} signals={searchCorpus.signals} onAddToCase={openCaseHandoff} onInspect={(content, context) => { openInspector(content, context); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace restoreContext={shell.inspector?.content.returnContext} entities={searchCorpus.entities} onAddToCase={openCaseHandoff} onInspect={(content, context) => { openInspector(content, context); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onAddToCase={(development, briefId) => { setCasePickerRequest({ kind: "development", development, briefId }); }} onInspect={(content) => { openInspector(content); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} refreshToken={caseDataVersion} onAddEvidence={beginCaseEvidence} onInspect={(content) => { openInspector(content); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : lens === "graph" ? <GraphWorkspace corpus={searchCorpus} focusId={graphFocusId} focusToken={graphFocusToken} expandId={graphExpandId} onInspect={(content) => { openInspector(content); dispatch({ type: "pin-inspector" }); }} /> : <ModeFoundation mode={lens} />}</div>)}
           {shell.visitedLenses.includes("settings") && <div className={`workspace-lens${mode === "settings" ? " active" : ""}`} aria-hidden={mode !== "settings"} {...(mode !== "settings" ? { inert: true } : {})}><SettingsWorkspace {...mapSettingsState} onChange={updateMapSettings} /></div>}
           {shell.inspector?.presentation === "overlay" && <><button type="button" className="workspace-inspector-scrim" onClick={() => dispatch({ type: "close-inspector" })} aria-label="Close inspector" /><InspectorPanel activeLens={mode} content={shell.inspector.content} corpus={searchCorpus} presentation="overlay" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onExpandGraph={expandOnGraph} onFocusGraph={focusOnGraph} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewGraph={viewOnGraph} onViewMap={viewOnMap} /></>}
         </div>

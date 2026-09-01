@@ -27,7 +27,7 @@ export const timeZoneOptions: Array<{ value: MapTimeZone; label: string }> = [
   ...supportedTimeZones.map((timeZone) => ({ value: timeZone, label: timeZoneLabel(timeZone) })),
 ];
 
-export function isSupportedMapTimeZone(value: unknown): value is MapTimeZone {
+function isSupportedMapTimeZone(value: unknown): value is MapTimeZone {
   return value === "local" || value === "UTC" || (typeof value === "string" && supportedTimeZoneSet.has(value));
 }
 
@@ -38,16 +38,4 @@ export function normalizeMapSettings(input: unknown): MapSettings {
     timeFormat: candidate.timeFormat === "12h" ? "12h" : defaultMapSettings.timeFormat,
     signalPanelEnabled: typeof candidate.signalPanelEnabled === "boolean" ? candidate.signalPanelEnabled : defaultMapSettings.signalPanelEnabled,
   };
-}
-
-export function formatMapClock(date: Date, timeZone: MapTimeZone, timeFormat: TimeFormat) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: timeFormat === "12h",
-    ...(timeZone === "local" ? {} : { timeZone }),
-  }).format(date);
-  const suffix = timeZone === "UTC" ? "Z" : timeZone === "local" ? "LOCAL" : new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value ?? timeZoneLabel(timeZone);
-  return `${parts} ${suffix}`;
 }

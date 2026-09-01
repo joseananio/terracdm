@@ -58,10 +58,6 @@ function roundRobinRssItems(feeds: ReturnType<typeof parseRssItems>[], limit: nu
   return items;
 }
 
-function formatGdeltTime(value?: string) {
-  return value && value.length >= 14 ? `${value.slice(8, 10)}:${value.slice(10, 12)}:${value.slice(12, 14)}` : new Date().toISOString().slice(11, 19);
-}
-
 function gdeltObservedAt(value?: string) {
   if (!value || value.length < 14) return new Date().toISOString();
   return isoTime(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T${value.slice(8, 10)}:${value.slice(10, 12)}:${value.slice(12, 14)}Z`);

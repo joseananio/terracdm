@@ -22,7 +22,3 @@ export const deterministicActions: DeterministicAction[] = [
   { id: "sanctions", label: "SANCTIONS", detail: "official OFAC SDN search", inputLabel: "NAME / IDENTIFIER", placeholder: "Enter name or identifier", defaultValue: "", method: "GET", path: "/api/osint/sanctions", queryParam: "q" },
   { id: "scan", label: "SCAN", detail: "configured active scanner", inputLabel: "TARGET", placeholder: "Enter target", defaultValue: "", method: "POST", path: "/api/osint/scanner" },
 ];
-
-export function getDeterministicAction(id: DeterministicActionId) {
-  return deterministicActions.find((action) => action.id === id) ?? deterministicActions[0];
-}

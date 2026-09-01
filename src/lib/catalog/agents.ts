@@ -43,7 +43,3 @@ export type AgentHelper = AgentHelperDefinition;
 export const agentHelpers = Object.fromEntries(
   roleDefinitions.map((role) => [role.id, role.helpers]),
 ) as Record<AgentRole, AgentHelper[]>;
-
-export function helperIds(role: AgentRole) {
-  return agentHelpers[role].map((helper) => helper.id);
-}

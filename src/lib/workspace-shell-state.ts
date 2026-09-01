@@ -2,7 +2,29 @@ export const workspaceLenses = ["signals", "brief", "cases", "entities", "graph"
 
 export type WorkspaceLens = (typeof workspaceLenses)[number];
 export type InspectorKind = "signal" | "entity" | "case" | "evidence" | "node" | "note";
-export type InspectorRef = { kind: InspectorKind; id: string; sourceLens: WorkspaceLens; title?: string; body?: string; updatedAt?: string; nodeType?: string; nodeSource?: string };
+/** The list state to restore when a user returns from an inspector handoff. */
+export type WorkspaceSelectionContext = {
+  lens: WorkspaceLens;
+  query?: string;
+  filter?: string;
+  sort?: string;
+  scrollTop?: number;
+  scopeId?: string;
+  tab?: string;
+};
+
+/** Canonical cross-lens selection identity and its originating list context. */
+export type InspectorRef = {
+  kind: InspectorKind;
+  id: string;
+  sourceLens: WorkspaceLens;
+  returnContext?: WorkspaceSelectionContext;
+  title?: string;
+  body?: string;
+  updatedAt?: string;
+  nodeType?: string;
+  nodeSource?: string;
+};
 export type InspectorState = { content: InspectorRef; presentation: "overlay" | "split" };
 
 export type WorkspaceShellState = {
@@ -69,10 +91,20 @@ export function readWorkspaceLocation(search: string): Partial<WorkspaceShellSta
   const kind = params.get("inspect");
   const id = params.get("id");
   const source = params.get("from");
+  const returnLens = params.get("returnLens");
+  const returnContext = isWorkspaceLens(returnLens) ? {
+    lens: returnLens,
+    ...(params.get("returnQ") ? { query: params.get("returnQ")! } : {}),
+    ...(params.get("returnFilter") ? { filter: params.get("returnFilter")! } : {}),
+    ...(params.get("returnSort") ? { sort: params.get("returnSort")! } : {}),
+    ...(params.has("returnScroll") && Number.isFinite(Number(params.get("returnScroll"))) ? { scrollTop: Math.max(0, Number(params.get("returnScroll"))) } : {}),
+    ...(params.get("returnScope") ? { scopeId: params.get("returnScope")! } : {}),
+    ...(params.get("returnTab") ? { tab: params.get("returnTab")! } : {}),
+  } : undefined;
   const presentation: InspectorState["presentation"] = params.get("panel") === "split" ? "split" : "overlay";
   const activeLens = isWorkspaceLens(lens) ? lens : undefined;
   const inspector = kind && id && ["signal", "entity", "case", "evidence", "node", "note"].includes(kind)
-    ? { content: { kind: kind as InspectorKind, id, sourceLens: isWorkspaceLens(source) ? source : activeLens ?? "map" }, presentation }
+    ? { content: { kind: kind as InspectorKind, id, sourceLens: isWorkspaceLens(source) ? source : activeLens ?? "map", ...(returnContext ? { returnContext } : {}) }, presentation }
     : undefined;
   return { ...(activeLens ? { activeLens } : {}), ...(inspector ? { inspector } : {}) };
 }
@@ -80,11 +112,21 @@ export function readWorkspaceLocation(search: string): Partial<WorkspaceShellSta
 export function writeWorkspaceLocation(state: WorkspaceShellState, currentSearch = "") {
   const params = new URLSearchParams(currentSearch);
   params.set("lens", state.activeLens);
-  for (const key of ["inspect", "id", "from", "panel"]) params.delete(key);
+  for (const key of ["inspect", "id", "from", "panel", "returnLens", "returnQ", "returnFilter", "returnSort", "returnScroll", "returnScope", "returnTab"]) params.delete(key);
   if (state.inspector) {
     params.set("inspect", state.inspector.content.kind);
     params.set("id", state.inspector.content.id);
     params.set("from", state.inspector.content.sourceLens);
+    const returnContext = state.inspector.content.returnContext;
+    if (returnContext) {
+      params.set("returnLens", returnContext.lens);
+      if (returnContext.query) params.set("returnQ", returnContext.query);
+      if (returnContext.filter) params.set("returnFilter", returnContext.filter);
+      if (returnContext.sort) params.set("returnSort", returnContext.sort);
+      if (typeof returnContext.scrollTop === "number") params.set("returnScroll", String(Math.round(returnContext.scrollTop)));
+      if (returnContext.scopeId) params.set("returnScope", returnContext.scopeId);
+      if (returnContext.tab) params.set("returnTab", returnContext.tab);
+    }
     if (state.inspector.presentation === "split") params.set("panel", "split");
   }
   return params.toString();

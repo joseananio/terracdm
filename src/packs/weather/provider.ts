@@ -1,5 +1,5 @@
 import { riskFromScore, type Entity, type ProviderSnapshot, type Signal } from "../../lib/intelligence";
-import { fetchJson, fetchText, isoTime, locationText, ProviderError, severityFor } from "../../lib/server/fetch-json";
+import { fetchJson, fetchText, isoTime, locationText, ProviderError } from "../../lib/server/fetch-json";
 import type { ProviderDefinition, ProviderImplementation, SignalPack } from "../../lib/catalog/types";
 
 type WeatherOutputContext = {

@@ -217,7 +217,7 @@ async function getOregonCctv(context: CctvContext) {
 async function getHongKongCctv(context: CctvContext) {
   const xml = await fetchText("https://static.data.gov.hk/td/traffic-snapshot-images/code/Traffic_Camera_Locations_En.xml", { headers: { accept: "application/xml,text/xml,*/*", "user-agent": "TerraCDM/0.1" } }, 15_000);
   const bounds = { minLat: 22.1, maxLat: 22.6, minLng: 113.8, maxLng: 114.5 };
-  const entities = (xml.match(/<image\b[^>]*>[\s\S]*?<\/image>/gi) ?? []).map((block, index) => {
+  const entities = (xml.match(/<image\b[^>]*>[\s\S]*?<\/image>/gi) ?? []).map((block) => {
     const key = cameraXmlText(block, "key");
     const feedUrl = cameraXmlText(block, "url");
     const lat = Number(cameraXmlText(block, "latitude"));
@@ -241,7 +241,7 @@ async function getHongKongCctv(context: CctvContext) {
 async function getNewZealandCctv(context: CctvContext) {
   const xml = await fetchText("https://trafficnz.info/service/traffic/rest/4/cameras/all", { headers: { accept: "application/xml,text/xml,*/*", "user-agent": "TerraCDM/0.1" } }, 15_000);
   const bounds = { minLat: -47.5, maxLat: -34, minLng: 166, maxLng: 179 };
-  const entities = (xml.match(/<camera\b[^>]*>[\s\S]*?<\/camera>/gi) ?? []).map((block, index) => {
+  const entities = (xml.match(/<camera\b[^>]*>[\s\S]*?<\/camera>/gi) ?? []).map((block) => {
     const region = cameraXmlText(block.match(/<region\b[^>]*>[\s\S]*?<\/region>/i)?.[0] ?? "", "name");
     const flat = block.replace(/<(journey|journeyLeg|region|way)>[\s\S]*?<\/\1>/g, "");
     const id = cameraXmlText(flat, "id");
@@ -277,7 +277,7 @@ function cameraPlainText(value: string) {
 async function getMichiganCctv(context: CctvContext) {
   const records = await fetchJson<Array<{ route?: string | null; county?: string | null; location?: string | null; direction?: string | null; image?: string | null }>>("https://mdotjboss.state.mi.us/MiDrive/camera/list", { headers: { "user-agent": "TerraCDM/0.1" } }, 15_000);
   const bounds = { minLat: 41.6, maxLat: 48.3, minLng: -90.5, maxLng: -82.1 };
-  const entities = records.map((record, index) => {
+  const entities = records.map((record) => {
     const county = String(record.county ?? "");
     const image = String(record.image ?? "");
     const coordinates = county.match(/lat=(-?[\d.]+)&(?:amp;)?lon=(-?[\d.]+)/);

@@ -718,15 +718,6 @@ export function MapWorkspace({ mapSettingsRequest, onFeedStatusChange, onMapSett
   useEffect(() => {
     onFeedStatusChange?.(statusText);
   }, [onFeedStatusChange, statusText]);
-  const liveSourceCount = snapshot.snapshots.filter((item) => item.status === "live").length;
-  const providerFailures = snapshot.snapshots.flatMap((item) => {
-    if (item.error) return item.error.split("; ").map((detail) => {
-      const match = detail.match(/^([^:]+):\s*(.+)$/);
-      return match ? { provider: match[1], detail: match[2] } : { provider: item.source.name, detail };
-    });
-    if (["degraded", "error", "unavailable", "key_required"].includes(item.status)) return [{ provider: item.source.name, detail: item.status.replace(/_/g, " ") }];
-    return [];
-  });
   const mapStyle = useMemo<StyleSpecification>(() => {
     if (baseMode === "carto" && cartoStyle) return cartoStyle;
     return {
@@ -1112,7 +1103,7 @@ export function MapWorkspace({ mapSettingsRequest, onFeedStatusChange, onMapSett
       {cartoEnabled && <button type="button" className={baseMode === "carto" ? "active" : ""} onClick={() => setBase("carto")} aria-pressed={baseMode === "carto"} aria-label="Carto dark map base">CARTO</button>}
       <button type="button" className={baseMode === "satellite" ? "active" : ""} onClick={() => setBase("satellite")} aria-pressed={baseMode === "satellite"} aria-label="Satellite imagery base">SAT</button>
     </div>}
-    {snapshot.fetchedAt && <LayerRail activeLayers={activeMapDomains} loadingLayers={loadingLayers} detailState={detailState} layersData={layers} snapshot={snapshot} selectedLayer={selectedLayer} open={layerOpen} onSelect={(domain) => { setSelectedLayer(domain); setLayerOpen(true); }} onToggleLayer={() => undefined} onToggleAll={toggleAllLayers} onToggleDetail={toggleDetail} onClose={() => setLayerOpen(false)} />}
+    {snapshot.fetchedAt && <LayerRail activeLayers={activeMapDomains} loadingLayers={loadingLayers} detailState={detailState} layersData={layers} snapshot={snapshot} selectedLayer={selectedLayer} open={layerOpen} onSelect={(domain) => { setSelectedLayer(domain); setLayerOpen(true); }} onToggleAll={toggleAllLayers} onToggleDetail={toggleDetail} onClose={() => setLayerOpen(false)} />}
     {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && !selectedSignal && <div className="map-signal-queue"><IncomingSignalQueue signals={signals} status={statusText} onOpenSignal={openSignal} onOpenEntity={focusEntity} onViewAll={onOpenSignalsWorkspace} /></div>}
     {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && selectedSignal && <div ref={signalPanelRef} className={`map-signal-node-sheet${signalPanelDragging ? " is-dragging" : ""}`} style={{ "--signal-drag-x": `${signalPanelOffset.x}px`, "--signal-drag-y": `${signalPanelOffset.y}px` } as CSSProperties} onPointerDown={handleSignalPanelDragStart} data-dragging={signalPanelDragging ? "true" : undefined}><MapNodeSheet entity={signalNode(selectedSignal)} onClose={() => setSelectedSignal(null)} onAgent={() => attachSignalToAgent(selectedSignal)} onGraph={openNodeGraph} facts={[]} observedLabel={selectedSignal.observedAt ? `${selectedSignal.observedAt.slice(11, 19)}Z` : "—"} media={selectedSignal.imageUrl ? { kind: "jpg", url: selectedSignal.imageUrl } : undefined} showDetail showMediaSourcePicker={false} sourceActionLabel="VIEW REPORT" /></div>}
     {snapshot.fetchedAt && <MapHud className="map-facts" facts={[

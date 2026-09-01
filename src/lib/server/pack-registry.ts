@@ -90,10 +90,6 @@ export function getProviderImplementation(id: string) {
   return providerImplementations.get(id);
 }
 
-export function hasProviderImplementation(id: string) {
-  return providerImplementations.has(id);
-}
-
 export function getGraphImplementation(id: string | undefined) {
   return id ? graphImplementations.get(id) : undefined;
 }

@@ -18,12 +18,6 @@ function resolveUri(value: string, base: string) {
   try { return new URL(value.trim(), base).toString(); } catch { return null; }
 }
 
-function firstVariant(manifest: string, base: string) {
-  const lines = manifest.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const index = lines.findIndex((line) => line.startsWith("#EXT-X-STREAM-INF"));
-  return index >= 0 ? resolveUri(lines[index + 1] ?? "", base) : null;
-}
-
 function segmentAge(manifest: string) {
   const dates = [
     ...[...manifest.matchAll(/#EXT-X-PROGRAM-DATE-TIME:(.+)/g)].map((match) => Date.parse(match[1].trim())),

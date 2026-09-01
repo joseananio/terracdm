@@ -1,4 +1,4 @@
-import { Domain, Entity, Signal } from "../intelligence";
+import { Signal } from "../intelligence";
 import { observationsToEntities, observationsToSignals } from "../catalog/observations";
 import { getSnapshot } from "./providers";
 import { bitcoinLookup, cveLookup, dnsLookup, ethereumLookup, ipLookup, scannerLookup, searchSanctions, tlsLookup, validateQuery, whoisLookup } from "./osint";
@@ -8,7 +8,7 @@ export type AgentResult = { traceId: string; intent: string; summary: string; st
 
 function renderSignal(signal: Signal) { return `${signal.name} · ${signal.description} · ${signal.source.name}`; }
 
-export async function runAgentTask(command: string, context?: { entityIds?: string[] }) : Promise<AgentResult> {
+export async function runAgentTask(command: string, _context?: { entityIds?: string[] }) : Promise<AgentResult> {
   const normalized = command.toLowerCase();
   let intent = "INTELLIGENCE BRIEF / LIVE";
   let data: unknown = null;

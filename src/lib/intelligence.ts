@@ -160,13 +160,3 @@ export const defaultLayerIds = defaultCatalogLayerIds();
 export const layerDetails: Record<string, LayerDetail[]> = Object.fromEntries(
   getCatalog().layers.map((layer) => [layer.id, layer.details.map((item) => ({ id: item.id, label: item.label, match: (entity: Entity) => matchesCatalogPredicate(entity, item.when) }))]),
 );
-
-export const signals: Signal[] = [];
-
-export const entities: Entity[] = [];
-
-export const graphNodes: GraphNode[] = [];
-
-export const graphLinks: GraphLink[] = [];
-
-export const formatTime = () => new Date().toISOString().slice(11, 19) + "Z";

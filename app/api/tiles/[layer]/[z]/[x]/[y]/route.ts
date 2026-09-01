@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { ByteLruCache } from "@/src/lib/server/byte-lru-cache";
 
 export const runtime = "nodejs";
@@ -35,7 +35,7 @@ function response(body: ArrayBuffer, contentType: string, cacheStatus: "HIT" | "
   });
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<TileParams> }) {
+export async function GET(_request: Request, { params }: { params: Promise<TileParams> }) {
   const { layer: rawLayer, z: rawZoom, x: rawX, y: rawY } = await params;
   const layer = rawLayer as TileLayer;
   if (!(layer in upstreams)) return NextResponse.json({ error: "Unknown tile layer" }, { status: 404 });

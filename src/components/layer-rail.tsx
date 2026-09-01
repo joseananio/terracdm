@@ -34,14 +34,13 @@ type LayerRailProps = {
   selectedLayer: Domain;
   open: boolean;
   onSelect: (domain: Domain) => void;
-  onToggleLayer: (domain: Domain) => void;
   onToggleAll: () => void;
   onToggleDetail: (domain: Domain, detailId: string) => void;
   onClose: () => void;
   topControl?: ReactNode;
 };
 
-export function LayerRail({ activeLayers, loadingLayers = [], detailState, layersData, snapshot, selectedLayer, open, onSelect, onToggleLayer, onToggleAll, onToggleDetail, onClose, topControl }: LayerRailProps) {
+export function LayerRail({ activeLayers, loadingLayers = [], detailState, layersData, snapshot, selectedLayer, open, onSelect, onToggleAll, onToggleDetail, onClose, topControl }: LayerRailProps) {
   const layerSystemRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
   const selected = layersData.find((layer) => layer.id === selectedLayer) ?? layersData[0];

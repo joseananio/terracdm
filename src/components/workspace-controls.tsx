@@ -70,16 +70,3 @@ export function WorkspaceSelect<T extends string>({ ariaLabel, disabled, onChang
     </SelectContent>
   </Select>;
 }
-
-export function WorkspaceSegmentedTabs<T extends string>({ ariaLabel, onChange, options, value }: { ariaLabel: string; onChange: (value: T) => void; options: WorkspaceControlOption<T>[]; value: T }) {
-  return <div className="workspace-segmented-tabs" role="tablist" aria-label={ariaLabel}>
-    {options.map((option, index) => <button key={option.value} type="button" role="tab" aria-selected={value === option.value} tabIndex={value === option.value ? 0 : -1} data-segment-value={option.value} onClick={() => onChange(option.value)} onKeyDown={(event) => {
-      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-      event.preventDefault();
-      const offset = event.key === "ArrowRight" ? 1 : -1;
-      const next = options[(index + offset + options.length) % options.length];
-      onChange(next.value);
-      requestAnimationFrame(() => (event.currentTarget.parentElement?.querySelector(`[data-segment-value="${next.value}"]`) as HTMLButtonElement | null)?.focus());
-    }}>{option.label}</button>)}
-  </div>;
-}

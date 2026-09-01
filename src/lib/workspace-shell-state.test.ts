@@ -18,11 +18,20 @@ test("split widths are bounded", () => {
 
 test("URL state round trips", () => {
   const state = workspaceShellReducer(
-    workspaceShellReducer(defaultWorkspaceShellState, { type: "open-inspector", content: { kind: "entity", id: "entity 1", sourceLens: "entities" } }),
+    workspaceShellReducer(defaultWorkspaceShellState, { type: "open-inspector", content: { kind: "entity", id: "entity 1", sourceLens: "entities", returnContext: { lens: "entities", query: "france 24", filter: "located", sort: "risk", scrollTop: 319 } } }),
     { type: "pin-inspector" },
   );
   const search = writeWorkspaceLocation(state);
   const restored = readWorkspaceLocation(search);
   assert.equal(restored.activeLens, "map");
   assert.deepEqual(restored.inspector, state.inspector);
+});
+
+test("URL state preserves unrelated search parameters", () => {
+  const state = workspaceShellReducer(defaultWorkspaceShellState, { type: "open-inspector", content: { kind: "signal", id: "sig/1", sourceLens: "signals", returnContext: { lens: "signals", query: "Gaza & Sudan", filter: "high", sort: "newest" } } });
+  const search = writeWorkspaceLocation(state, "?theme=dark");
+  const restored = readWorkspaceLocation(search);
+  assert.equal(new URLSearchParams(search).get("theme"), "dark");
+  assert.deepEqual(restored.inspector?.content.returnContext, state.inspector?.content.returnContext);
+  assert.equal(restored.inspector?.content.id, "sig/1");
 });

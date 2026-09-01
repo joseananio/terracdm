@@ -3,11 +3,8 @@ import { CanonicalProviderSnapshot, type Observation } from "../intelligence";
 import { ingestObservations } from "./observation-repository";
 import { providerSnapshotRevision, stableMaterialJson } from "./provider-revision";
 
-type Watchlist = { id: string; name: string; entityIds: string[]; createdAt: string; storage: "supabase" | "memory" };
 type AgentRun = { id: string; prompt: string; intent: string; summary: string; steps: string[]; evidence: string[]; createdAt: string; storage: "supabase" | "memory" };
 
-const memoryWatchlists = new Map<string, Watchlist>();
-const memoryRuns = new Map<string, AgentRun>();
 const OBSERVATION_BATCH_SIZE = 500;
 const REST_FILTER_BATCH_SIZE = 50;
 
@@ -33,9 +30,7 @@ export async function saveAgentRun(run: Omit<AgentRun, "id" | "createdAt" | "sto
     const { error } = await client.from("agent_runs").insert({ id, intent: run.intent, prompt: run.prompt, summary: run.summary, steps: run.steps, evidence: run.evidence });
     if (!error) return { ...run, id, createdAt, storage: "supabase" as const };
   }
-  const result = { ...run, id, createdAt, storage: "memory" as const };
-  memoryRuns.set(id, result);
-  return result;
+  return { ...run, id, createdAt, storage: "memory" as const };
 }
 
 export async function saveWatchlist(name: string, entityIds: string[]) {
@@ -46,12 +41,8 @@ export async function saveWatchlist(name: string, entityIds: string[]) {
     const { error } = await client.from("watchlists").insert({ id, name, entity_ids: entityIds });
     if (!error) return { id, name, entityIds, createdAt, storage: "supabase" as const };
   }
-  const result = { id, name, entityIds, createdAt, storage: "memory" as const };
-  memoryWatchlists.set(id, result);
-  return result;
+  return { id, name, entityIds, createdAt, storage: "memory" as const };
 }
-
-export async function listAgentRuns() { return [...memoryRuns.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 
 function observationSearchText(observation: Observation) {
   return [

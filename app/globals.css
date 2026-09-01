@@ -244,11 +244,6 @@
 [data-workspace-menu] svg { color: var(--cyan); }
 [data-workspace-select] { width: auto; min-width: 104px; height: 34px; padding: 0 10px; border: 0; border-radius: 3px; color: var(--muted); background: rgba(231, 242, 246, .045); box-shadow: none; font: 500 11px var(--mono); text-transform: capitalize; }
 [data-workspace-select]:focus-visible, [data-workspace-select][data-state="open"] { border: 0; color: var(--text); background: rgba(86, 215, 255, .07); box-shadow: inset 0 0 0 1px rgba(86, 215, 255, .25); outline: 0; }
-.workspace-segmented-tabs { min-height: 34px; display: flex; align-items: stretch; gap: 2px; padding: 2px; background: rgba(231, 242, 246, .045); }
-.workspace-segmented-tabs button { min-width: 58px; height: 30px; padding: 0 10px; color: var(--muted); background: transparent; font: 500 var(--text-xs) var(--mono); text-transform: capitalize; }
-.workspace-segmented-tabs button:hover { color: var(--text); background: rgba(86, 215, 255, .055); }
-.workspace-segmented-tabs button[aria-selected="true"] { color: var(--text); background: rgba(86, 215, 255, .14); box-shadow: inset 0 0 0 1px rgba(86, 215, 255, .22); }
-.workspace-segmented-tabs button:focus-visible { outline: 1px solid var(--cyan); outline-offset: -1px; }
 .workspace-signal-columns { min-height: 32px; flex: 0 0 auto; display: grid; grid-template-columns: minmax(260px, 1fr) 90px minmax(110px, 160px) 58px 28px; align-items: center; gap: 12px; padding: 0 36px 0 52px; color: var(--faint); border-bottom: 1px solid rgba(151, 177, 185, .09); font: 400 var(--text-xs) var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .workspace-signal-list { min-height: 0; overflow-y: auto; }
 .workspace-signal-row { position: relative; min-height: 72px; border-bottom: 1px solid rgba(151, 177, 185, .09); }

@@ -85,9 +85,9 @@ This tracks the original signal-first interface plan against the current impleme
 
 - [x] Keep selected inspectors available while switching lenses.
 - [x] Provide an intentional View on map action rather than forcing Map navigation.
-- [ ] Create a canonical object route/selection model shared by Signals, Entities, Cases, Graph, Timeline, and Map.
+- [x] Create a canonical object route/selection model shared by Signals, Entities, Cases, Graph, Timeline, and Map. Inspector selections now carry a stable kind/id, originating lens, and serializable return context.
 - [ ] Add Open in Graph, Open in Case, Open in Timeline, and Open entity actions where valid. Open in Graph is now available from record inspectors and Map node sheets.
-- [ ] Preserve list query, filters, scroll position, and selection when moving between lenses.
+- [x] Preserve list query, filters, scroll position, and selection when moving between lenses. Signals and Entities restore their captured list context; the shared URL model is ready for the remaining lens-specific state.
 - [ ] Support pinning quick inspectors into the split from every applicable lens.
 - [ ] Decide whether Signals becomes the default startup lens; Map remains the current default.
 
