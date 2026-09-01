@@ -458,7 +458,17 @@ export async function buildNodeGraph(root: NodeGraphEntity, candidates: NodeGrap
 export async function buildRepositoryNodeGraph(selectedObservationId: string) {
   const observation = await findObservationById(selectedObservationId);
   if (!observation) return { error: "The selected observation is not available in the server repository", status: 404 as const };
-  if (observation.kind !== "entity") return { error: "A selected entity observation is required", status: 400 as const };
+  if (observation.kind === "signal") {
+    const candidates = await queryObservations({ kinds: ["entity"], limit: 2_000 });
+    const target = nearestEntity(observation, candidates.observations.filter((candidate): candidate is NodeGraphEntity => candidate.kind === "entity"));
+    const nodes = [graphNodeForSignal(observation)];
+    const links: GraphLink[] = [];
+    if (target) {
+      nodes.push(graphNodeForEntity(target));
+      links.push({ source: `signal:${observation.id}`, target: target.id, label: "SIGNAL NEARBY" });
+    }
+    return { rootId: `signal:${observation.id}`, nodes, links, sources: { local: links.length, wikidata: "no_match" as const }, helpers: agentHelpers["entity-intel"], fetchedAt: new Date().toISOString() };
+  }
 
   const candidates = await queryObservations({ kinds: ["entity"], limit: 2_000 });
   return buildNodeGraph(

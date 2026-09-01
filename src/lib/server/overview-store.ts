@@ -58,6 +58,22 @@ function supabaseServer(): SupabaseClient | null {
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
 }
 
+async function broadcastOverviewUpdate(client: SupabaseClient, artifact: OverviewArtifact) {
+  const channel = client.channel("terracdm-overview");
+  try {
+    const result = await channel.httpSend("overview-update", {
+      artifactId: artifact.id,
+      workspaceKey: artifact.workspaceKey,
+      updatedAt: artifact.createdAt,
+    });
+    if (!result.success) throw new Error(result.error);
+  } catch (error) {
+    console.warn("Failed to broadcast overview update", error);
+  } finally {
+    try { await client.removeChannel(channel); } catch { /* Broadcast cleanup is best-effort. */ }
+  }
+}
+
 function normalizeContext(context: ChatContext) {
   return {
     viewport: context.viewport,
@@ -136,7 +152,9 @@ export async function updateOverviewArtifact(id: string, patch: { overview?: str
     const updates = { ...(patch.overview !== undefined ? { overview: patch.overview } : {}), ...(patch.developments ? { developments: patch.developments } : {}), updated_at: new Date().toISOString() };
     const { data, error } = await client.from("overview_artifacts").update(updates).eq("id", id).select("*").single();
     if (error) throw new Error(`brief update failed: ${error.message}`);
-    return artifactFromRow(data);
+    const artifact = artifactFromRow(data);
+    await broadcastOverviewUpdate(client, artifact);
+    return artifact;
   }
   const state = await readLocalState();
   const current = state.artifacts.find((artifact) => artifact.id === id);
@@ -232,7 +250,9 @@ export async function saveOverviewArtifact(input: { context: ChatContext; result
       throw new Error(`overview artifact write failed: ${error.message}`);
     }
     if (input.jobId) await updateOverviewJob(input.jobId, { status: "completed" });
-    return artifactFromRow(data);
+    const artifact = artifactFromRow(data);
+    await broadcastOverviewUpdate(client, artifact);
+    return artifact;
   }
   const createdAt = new Date().toISOString();
   const artifact: OverviewArtifact = { ...input.result, id: crypto.randomUUID(), workspaceKey, contextHash, trigger: input.trigger, createdAt, storage: "memory" };

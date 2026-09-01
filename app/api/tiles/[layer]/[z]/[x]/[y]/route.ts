@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ByteLruCache } from "@/src/lib/server/byte-lru-cache";
 
 export const runtime = "nodejs";
 
@@ -12,8 +13,10 @@ const upstreams: Record<TileLayer, string> = {
   satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile",
   ecdis: "https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/ENCOnline/MapServer/exts/MaritimeChartService/WMSServer",
 };
-const cache = new Map<string, CachedTile>();
-const maxEntries = 256;
+const defaultCacheBytes = 32 * 1024 * 1024;
+const configuredCacheBytes = Number(process.env.TILE_CACHE_MAX_BYTES);
+const maxCacheBytes = Number.isSafeInteger(configuredCacheBytes) && configuredCacheBytes > 0 ? configuredCacheBytes : defaultCacheBytes;
+const cache = new ByteLruCache<string, CachedTile>(maxCacheBytes, (tile) => tile.body.byteLength);
 const ttlMs = 24 * 60 * 60 * 1000;
 
 function tileNumber(value: string, maximum: number) {
@@ -66,7 +69,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<Ti
     if (!contentType.startsWith("image/")) return NextResponse.json({ error: "Tile source did not return an image" }, { status: 502 });
     const body = await upstreamResponse.arrayBuffer();
     cache.set(key, { body, contentType, expiresAt: Date.now() + ttlMs });
-    while (cache.size > maxEntries) cache.delete(cache.keys().next().value as string);
     return response(body, contentType, "MISS");
   } catch {
     return NextResponse.json({ error: "Tile source unavailable" }, { status: 502 });

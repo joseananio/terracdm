@@ -75,18 +75,18 @@ This tracks the original signal-first interface plan against the current impleme
 
 - [x] Add the Graph lens shell.
 - [x] Retain the existing object-level relationship graph used by Map panels.
-- [ ] Build the top-level Graph workspace.
-- [ ] Open a graph from the current signal, entity, or case context.
-- [ ] Add node selection, filtering, expansion, and a shared node inspector.
-- [ ] Synchronize selected nodes with Map, Entities, Signals, and Cases without losing context.
-- [ ] Define scale controls that prevent the global graph from becoming noisy.
+- [x] Build the top-level Graph workspace.
+- [x] Open a graph from the current signal, entity, or case context.
+- [x] Add node selection, filtering, expansion, and a shared node inspector.
+- [ ] Synchronize selected nodes with Map, Entities, Signals, and Cases without losing context. Map ↔ Graph focus handoffs and right-rail graph focusing are now supported; broader cross-lens selection remains.
+- [ ] Define scale controls that prevent the global graph from becoming noisy. Targeted graph handoffs and progressive node expansion are now available.
 
 ## Cross-lens object workflow
 
 - [x] Keep selected inspectors available while switching lenses.
 - [x] Provide an intentional View on map action rather than forcing Map navigation.
 - [ ] Create a canonical object route/selection model shared by Signals, Entities, Cases, Graph, Timeline, and Map.
-- [ ] Add Open in Graph, Open in Case, Open in Timeline, and Open entity actions where valid.
+- [ ] Add Open in Graph, Open in Case, Open in Timeline, and Open entity actions where valid. Open in Graph is now available from record inspectors and Map node sheets.
 - [ ] Preserve list query, filters, scroll position, and selection when moving between lenses.
 - [ ] Support pinning quick inspectors into the split from every applicable lens.
 - [ ] Decide whether Signals becomes the default startup lens; Map remains the current default.

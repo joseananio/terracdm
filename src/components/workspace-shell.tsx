@@ -26,11 +26,13 @@ import { MaplibreReactSpike, type WorkspaceMapSettingsRequest, type WorkspaceMap
 import { SignalIcon } from "@/src/components/incoming-signal-queue";
 import { WorkspaceMenu, WorkspaceSelect } from "@/src/components/workspace-controls";
 import { CasePickerDialog, CasesWorkspace, type CasePickerRequest } from "@/src/components/cases-workspace";
+import { GraphWorkspace } from "@/src/components/graph-workspace";
 import type { BriefDevelopment } from "@/src/lib/brief";
 import type { ChatReference } from "@/src/lib/server/chat";
 import type { FeedStatus } from "@/src/lib/feed-status";
 import { geosearchKindLabel, type GeosearchResult } from "@/src/lib/geosearch";
 import type { Entity, Signal } from "@/src/lib/intelligence";
+import { subscribeToOverview } from "@/src/lib/client/realtime";
 import { defaultMapSettings, timeZoneOptions, type MapSettings, type MapTimeZone, type TimeFormat } from "@/src/lib/map-settings";
 import { defaultWorkspaceShellState, readWorkspaceLocation, workspaceLenses, workspaceShellReducer, writeWorkspaceLocation, type InspectorRef, type WorkspaceLens } from "@/src/lib/workspace-shell-state";
 
@@ -298,12 +300,20 @@ function ModeFoundation({ mode }: { mode: Exclude<WorkspaceMode, "map" | "settin
   );
 }
 
-function InspectorPanel({ content, corpus, onAddToCase, onClose, onPin, onUnpin, onViewMap, presentation }: { content: InspectorRef; corpus: WorkspaceSearchCorpus; onAddToCase: (content: InspectorRef) => void; onClose: () => void; onPin: () => void; onUnpin: () => void; onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void; presentation: "overlay" | "split" }) {
+function InspectorGraphActions({ content, onExpand, onFocus, onView }: { content: InspectorRef; onExpand: (content: InspectorRef) => void; onFocus: (content: InspectorRef) => void; onView: (content: InspectorRef) => void }) {
+  return <>
+    <button type="button" onClick={() => onFocus(content)}><ShareNetwork size={15} />Focus graph<ArrowSquareOut size={13} /></button>
+    <button type="button" onClick={() => onExpand(content)}><ShareNetwork size={15} />Expand relationships<ArrowSquareOut size={13} /></button>
+    <button type="button" onClick={() => onView(content)}><ShareNetwork size={15} />View on graph<ArrowSquareOut size={13} /></button>
+  </>;
+}
+
+function InspectorPanel({ content, corpus, onAddToCase, onClose, onExpandGraph, onFocusGraph, onPin, onUnpin, onViewGraph, onViewMap, presentation }: { content: InspectorRef; corpus: WorkspaceSearchCorpus; onAddToCase: (content: InspectorRef) => void; onClose: () => void; onExpandGraph: (content: InspectorRef) => void; onFocusGraph: (content: InspectorRef) => void; onPin: () => void; onUnpin: () => void; onViewGraph: (content: InspectorRef) => void; onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void; presentation: "overlay" | "split" }) {
   const record = content.kind === "signal" ? corpus.signals.find((item) => item.id === content.id) : content.kind === "entity" ? corpus.entities.find((item) => item.id === content.id) : undefined;
-  const textContent = (content.kind === "note" || content.kind === "evidence") && content.body ? content : undefined;
+  const textContent = (content.kind === "note" || content.kind === "evidence" || content.kind === "node") && content.body ? content : undefined;
   return <aside className={`workspace-inspector workspace-inspector-${presentation}`} aria-label={`${content.kind} inspector`}>
     <header><span>{content.kind}</span><div><button type="button" onClick={presentation === "split" ? onUnpin : onPin} aria-label={presentation === "split" ? "Unpin inspector" : "Pin inspector"} title={presentation === "split" ? "Unpin" : "Pin"}><PushPin size={15} weight={presentation === "split" ? "fill" : "regular"} /></button><button type="button" onClick={onClose} aria-label="Close inspector"><X size={16} /></button></div></header>
-    {record ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className={`workspace-inspector-icon ${record.risk}`}><SignalIcon domain={record.domain} /></span><span className={`workspace-inspector-risk ${record.risk}`}>{record.risk} risk</span></div><h2>{record.name}</h2><p>{record.description || "No description available."}</p><dl><div><dt>Observed</dt><dd>{new Date(record.observedAt).toLocaleString()}</dd></div><div><dt>Domain</dt><dd>{record.domain}</dd></div><div><dt>Risk score</dt><dd>{record.riskScore}</dd></div>{record.location?.label && <div><dt>Location</dt><dd>{record.location.label}</dd></div>}<div><dt>Source</dt><dd>{record.source.name}</dd></div><div><dt>Provider</dt><dd>{record.providerId}</dd></div></dl><div className="workspace-inspector-actions"><button type="button" onClick={() => onAddToCase(content)}><FolderOpen size={15} />Add to case</button>{record.location?.coordinates && <button type="button" className="workspace-inspector-map" onClick={() => onViewMap({ kind: record.kind, value: record } as Omit<WorkspaceSearchSelection, "token">)}><MapTrifold size={15} />View on map<ArrowSquareOut size={13} /></button>}{record.url && <a href={record.url} target="_blank" rel="noreferrer">Open source<ArrowSquareOut size={13} /></a>}</div></div> : textContent ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className="workspace-inspector-risk">{content.kind}</span></div><h2>{textContent.title || (content.kind === "note" ? "Case note" : "Evidence")}</h2><p>{textContent.body}</p>{textContent.updatedAt && <dl><div><dt>Updated</dt><dd>{new Date(textContent.updatedAt).toLocaleString()}</dd></div></dl>}</div> : <div className="workspace-inspector-missing"><p>This object is not available in the current intelligence snapshot.</p></div>}
+    {record ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className={`workspace-inspector-icon ${record.risk}`}><SignalIcon domain={record.domain} /></span><span className={`workspace-inspector-risk ${record.risk}`}>{record.risk} risk</span></div><h2>{record.name}</h2><p>{record.description || "No description available."}</p><dl><div><dt>Observed</dt><dd>{new Date(record.observedAt).toLocaleString()}</dd></div><div><dt>Domain</dt><dd>{record.domain}</dd></div><div><dt>Risk score</dt><dd>{record.riskScore}</dd></div>{record.location?.label && <div><dt>Location</dt><dd>{record.location.label}</dd></div>}<div><dt>Source</dt><dd>{record.source.name}</dd></div><div><dt>Provider</dt><dd>{record.providerId}</dd></div></dl><div className="workspace-inspector-actions"><button type="button" onClick={() => onAddToCase(content)}><FolderOpen size={15} />Add to case</button>{record.location?.coordinates && <button type="button" className="workspace-inspector-map" onClick={() => onViewMap({ kind: record.kind, value: record } as Omit<WorkspaceSearchSelection, "token">)}><MapTrifold size={15} />View on map<ArrowSquareOut size={13} /></button>}<InspectorGraphActions content={content} onExpand={onExpandGraph} onFocus={onFocusGraph} onView={onViewGraph} />{record.url && <a href={record.url} target="_blank" rel="noreferrer">Open source<ArrowSquareOut size={13} /></a>}</div></div> : textContent ? <div className="workspace-inspector-content"><div className="workspace-inspector-lead"><span className="workspace-inspector-risk">{content.kind}</span></div><h2>{textContent.title || (content.kind === "note" ? "Case note" : content.kind === "node" ? "Graph node" : "Evidence")}</h2><p>{textContent.body}</p>{content.kind === "node" && <div className="workspace-inspector-actions"><button type="button" className="workspace-inspector-graph" onClick={() => onExpandGraph(content)}><ShareNetwork size={15} />Expand relationships<ArrowSquareOut size={13} /></button></div>}{textContent.updatedAt && <dl><div><dt>Updated</dt><dd>{new Date(textContent.updatedAt).toLocaleString()}</dd></div></dl>}</div> : <div className="workspace-inspector-missing"><p>This object is not available in the current intelligence snapshot.</p></div>}
   </aside>;
 }
 
@@ -331,6 +341,9 @@ export function WorkspaceShell() {
   const [searchSelection, setSearchSelection] = useState<WorkspaceSearchSelection | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [graphFocusId, setGraphFocusId] = useState<string | null>(null);
+  const [graphFocusToken, setGraphFocusToken] = useState(0);
+  const [graphExpandId, setGraphExpandId] = useState<string | null>(null);
   const [workspaceToolRequest, setWorkspaceToolRequest] = useState<WorkspaceToolRequest | null>(null);
   const [workspaceToolState, setWorkspaceToolState] = useState<WorkspaceToolState>({ chatOpen: false, actionsOpen: false });
   const [briefUnread, setBriefUnread] = useState(false);
@@ -396,17 +409,45 @@ export function WorkspaceShell() {
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
+    let rerun = false;
     const check = async () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      if (inFlight) {
+        rerun = true;
+        return;
+      }
+      inFlight = true;
       try {
         const response = await fetch("/api/overview", { cache: "no-store" });
         if (!response.ok) return;
         const payload = await response.json() as { artifact?: { id: string } | null };
         if (!cancelled && payload.artifact?.id) setBriefUnread(window.localStorage.getItem("terracdm:brief:viewed") !== payload.artifact.id);
       } catch { /* A brief badge is non-critical. */ }
+      finally {
+        inFlight = false;
+        if (rerun && !cancelled) {
+          rerun = false;
+          void check();
+        }
+      }
     };
+    const reconcile = () => void check();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    const unsubscribe = subscribeToOverview(reconcile);
     void check();
-    const interval = window.setInterval(() => void check(), 15_000);
-    return () => { cancelled = true; window.clearInterval(interval); };
+    const interval = window.setInterval(reconcile, 5 * 60_000);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", reconcile);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", reconcile);
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -428,6 +469,40 @@ export function WorkspaceShell() {
   const viewOnMap = (selection: Omit<WorkspaceSearchSelection, "token">) => {
     setMode("map");
     setSearchSelection({ ...selection, token: Date.now() } as WorkspaceSearchSelection);
+  };
+
+  const viewOnGraph = (content: InspectorRef) => {
+    if (content.kind !== "signal" && content.kind !== "entity") return;
+    setGraphFocusId(content.kind === "signal" ? `signal:${content.id}` : content.id);
+    setGraphExpandId(null);
+    setMode("graph");
+  };
+
+  const focusOnGraph = (content: InspectorRef) => {
+    if (content.kind !== "signal" && content.kind !== "entity") return;
+    setGraphFocusId(content.kind === "signal" ? `signal:${content.id}` : content.id);
+    setGraphExpandId(null);
+    setGraphFocusToken((token) => token + 1);
+    setMode("graph");
+  };
+
+  const expandOnGraph = (content: InspectorRef) => {
+    if (content.kind === "node") {
+      if (mode === "graph") setGraphExpandId(content.id);
+      setMode("graph");
+      return;
+    }
+    if (content.kind !== "signal" && content.kind !== "entity") return;
+    const focusId = content.kind === "signal" ? `signal:${content.id}` : content.id;
+    setGraphFocusId(focusId);
+    setGraphExpandId(mode === "graph" ? focusId : null);
+    setMode("graph");
+  };
+
+  const viewEntityOnGraph = (entity: Entity) => {
+    setGraphFocusId(entity.id);
+    setGraphExpandId(null);
+    setMode("graph");
   };
 
   const beginSplitResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -513,14 +588,14 @@ export function WorkspaceShell() {
 
       <div className="workspace-stage">
         <div className="workspace-lens-stage">
-          <div className={`workspace-map-stage${mode === "map" ? " active" : ""}`} aria-hidden={mode !== "map"} {...(mode !== "map" ? { inert: true } : {})}><MaplibreReactSpike mapSettingsRequest={mapSettingsRequest} onFeedStatusChange={setFeedStatus} onMapSettingsStateChange={setMapSettingsState} onOpenSignalsWorkspace={() => setMode("signals")} onSearchCorpusChange={setSearchCorpus} onWorkspaceToolStateChange={setWorkspaceToolState} searchSelection={searchSelection} workspaceToolRequest={workspaceToolRequest} /></div>
-          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onAddToCase={(development, briefId) => { setCasePickerRequest({ kind: "development", development, briefId }); }} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} refreshToken={caseDataVersion} onAddEvidence={beginCaseEvidence} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : <ModeFoundation mode={lens} />}</div>)}
+          <div className={`workspace-map-stage${mode === "map" ? " active" : ""}`} aria-hidden={mode !== "map"} {...(mode !== "map" ? { inert: true } : {})}><MaplibreReactSpike mapSettingsRequest={mapSettingsRequest} onFeedStatusChange={setFeedStatus} onMapSettingsStateChange={setMapSettingsState} onOpenGraph={viewEntityOnGraph} onOpenSignalsWorkspace={() => setMode("signals")} onSearchCorpusChange={setSearchCorpus} onWorkspaceToolStateChange={setWorkspaceToolState} searchSelection={searchSelection} workspaceToolRequest={workspaceToolRequest} /></div>
+          {workspaceLenses.filter((lens): lens is Exclude<WorkspaceMode, "map" | "settings"> => lens !== "map" && lens !== "settings").map((lens) => shell.visitedLenses.includes(lens) && <div key={lens} className={`workspace-lens${mode === lens ? " active" : ""}`} aria-hidden={mode !== lens} {...(mode !== lens ? { inert: true } : {})}>{lens === "signals" ? <SignalWorkspace signals={searchCorpus.signals} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "entities" ? <EntityWorkspace entities={searchCorpus.entities} onAddToCase={openCaseHandoff} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : lens === "brief" ? <BriefWorkspace corpus={searchCorpus} onAsk={askFromBrief} onAddToCase={(development, briefId) => { setCasePickerRequest({ kind: "development", development, briefId }); }} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={navigateFromBrief} onViewMap={viewOnMap} /> : lens === "cases" ? <CasesWorkspace corpus={searchCorpus} handoffToken={caseHandoffToken} refreshToken={caseDataVersion} onAddEvidence={beginCaseEvidence} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} onNavigate={setMode} onViewMap={viewOnMap} /> : lens === "graph" ? <GraphWorkspace corpus={searchCorpus} focusId={graphFocusId} focusToken={graphFocusToken} expandId={graphExpandId} onInspect={(content) => { dispatch({ type: "open-inspector", content }); dispatch({ type: "pin-inspector" }); }} /> : <ModeFoundation mode={lens} />}</div>)}
           {shell.visitedLenses.includes("settings") && <div className={`workspace-lens${mode === "settings" ? " active" : ""}`} aria-hidden={mode !== "settings"} {...(mode !== "settings" ? { inert: true } : {})}><SettingsWorkspace {...mapSettingsState} onChange={updateMapSettings} /></div>}
-          {shell.inspector?.presentation === "overlay" && <><button type="button" className="workspace-inspector-scrim" onClick={() => dispatch({ type: "close-inspector" })} aria-label="Close inspector" /><InspectorPanel content={shell.inspector.content} corpus={searchCorpus} presentation="overlay" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} /></>}
+          {shell.inspector?.presentation === "overlay" && <><button type="button" className="workspace-inspector-scrim" onClick={() => dispatch({ type: "close-inspector" })} aria-label="Close inspector" /><InspectorPanel content={shell.inspector.content} corpus={searchCorpus} presentation="overlay" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onExpandGraph={expandOnGraph} onFocusGraph={focusOnGraph} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewGraph={viewOnGraph} onViewMap={viewOnMap} /></>}
         </div>
       </div>
       </div>
-      <div className={`workspace-split${splitExiting ? " exiting" : ""}`} aria-hidden={!splitOpen}><button type="button" className="workspace-split-handle" onPointerDown={beginSplitResize} onPointerMove={resizeSplit} onPointerUp={() => { splitDragRef.current = null; }} aria-label="Resize inspector" tabIndex={splitOpen ? 0 : -1} />{renderedSplitContent && <InspectorPanel content={renderedSplitContent} corpus={searchCorpus} presentation="split" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewMap={viewOnMap} />}</div>
+      <div className={`workspace-split${splitExiting ? " exiting" : ""}`} aria-hidden={!splitOpen}><button type="button" className="workspace-split-handle" onPointerDown={beginSplitResize} onPointerMove={resizeSplit} onPointerUp={() => { splitDragRef.current = null; }} aria-label="Resize inspector" tabIndex={splitOpen ? 0 : -1} />{renderedSplitContent && <InspectorPanel content={renderedSplitContent} corpus={searchCorpus} presentation="split" onAddToCase={openCaseHandoff} onClose={() => dispatch({ type: "close-inspector" })} onExpandGraph={expandOnGraph} onFocusGraph={focusOnGraph} onPin={() => dispatch({ type: "pin-inspector" })} onUnpin={() => dispatch({ type: "unpin-inspector" })} onViewGraph={viewOnGraph} onViewMap={viewOnMap} />}</div>
       {casePickerRequest && <CasePickerDialog corpus={searchCorpus} request={casePickerRequest} onClose={() => setCasePickerRequest(null)} onComplete={completeCasePicker} />}
     </main>
   );

@@ -26,7 +26,6 @@ import { isFireDomainId } from "@/src/lib/catalog/domains";
 import type { ProviderRequest, ProviderViewport } from "@/src/lib/catalog/types";
 
 const AgentSheet = dynamic(() => import("@/src/components/agent-sheet").then((module) => module.AgentSheet), { ssr: false });
-const NodeGraphSheet = dynamic(() => import("@/src/components/node-graph-sheet").then((module) => module.NodeGraphSheet), { ssr: false });
 
 type DirectionalRenderNode = {
   id: string;
@@ -571,12 +570,13 @@ type MaplibreReactSpikeProps = {
   onMapSettingsStateChange?: (state: WorkspaceMapSettingsState) => void;
   onWorkspaceToolStateChange?: (state: WorkspaceToolState) => void;
   onOpenSignalsWorkspace?: () => void;
+  onOpenGraph?: (entity: Entity) => void;
   mapSettingsRequest?: WorkspaceMapSettingsRequest | null;
   searchSelection?: WorkspaceSearchSelection | null;
   workspaceToolRequest?: WorkspaceToolRequest | null;
 };
 
-export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onMapSettingsStateChange, onOpenSignalsWorkspace, onSearchCorpusChange, onWorkspaceToolStateChange, searchSelection, workspaceToolRequest }: MaplibreReactSpikeProps = {}) {
+export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onMapSettingsStateChange, onOpenSignalsWorkspace, onOpenGraph, onSearchCorpusChange, onWorkspaceToolStateChange, searchSelection, workspaceToolRequest }: MaplibreReactSpikeProps = {}) {
   const [snapshot, setSnapshot] = useState<IntelligenceSnapshot>(emptySnapshot);
   const [error, setError] = useState<string | null>(null);
   const [projectionMode, setProjectionMode] = useState<"globe" | "flat">("globe");
@@ -593,13 +593,14 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [signalPanelOffset, setSignalPanelOffset] = useState({ x: 0, y: 0 });
   const [signalPanelDragging, setSignalPanelDragging] = useState(false);
-  const [graphEntity, setGraphEntity] = useState<Entity | null>(null);
   const [layerOpen, setLayerOpen] = useState(false);
   const [selectedLayer, setSelectedLayer] = useState<Domain>("aviation");
   const [detailState, setDetailState] = useState<Record<string, string[]>>(defaultDetailState);
   const [utilityTool, setUtilityTool] = useState<"home" | "actions">("home");
   const [mapSettings, setMapSettings] = useState<MapSettings>(defaultMapSettings);
   const [mapSettingsReady, setMapSettingsReady] = useState(false);
+  const mapSettingsDirtyRef = useRef(false);
+  const persistedMapSettingsRef = useRef(JSON.stringify(defaultMapSettings));
   const [agentCommand, setAgentCommand] = useState<string | null>(null);
   const [agentReferences, setAgentReferences] = useState<ChatReference[]>([]);
   const [deterministicAction, setDeterministicAction] = useState<DeterministicAction | null>(null);
@@ -645,12 +646,14 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
       .then((payload) => {
         if (cancelled) return;
         const next = normalizeMapSettings(payload.settings);
+        persistedMapSettingsRef.current = JSON.stringify(next);
         setMapSettings(next);
         setSignalQueueOpen(next.signalPanelEnabled);
         setMapSettingsReady(true);
       })
       .catch(() => {
         if (cancelled) return;
+        persistedMapSettingsRef.current = JSON.stringify(defaultMapSettings);
         setMapSettings(defaultMapSettings);
         setSignalQueueOpen(defaultMapSettings.signalPanelEnabled);
         setMapSettingsReady(true);
@@ -659,18 +662,31 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
   }, []);
 
   useEffect(() => {
-    if (!mapSettingsReady) return;
+    if (!mapSettingsReady || !mapSettingsDirtyRef.current) return;
+    const serialized = JSON.stringify(mapSettings);
+    if (serialized === persistedMapSettingsRef.current) {
+      mapSettingsDirtyRef.current = false;
+      return;
+    }
     const controller = new AbortController();
-    void fetch("/api/settings", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ settings: mapSettings }),
-      signal: controller.signal,
-    }).catch(() => { /* Keep the optimistic UI state; the next read will retry the persisted value. */ });
-    return () => controller.abort();
+    const timeout = window.setTimeout(() => {
+      void fetch("/api/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ settings: mapSettings }),
+        signal: controller.signal,
+      }).then((response) => {
+        if (response.ok) persistedMapSettingsRef.current = serialized;
+      }).catch(() => { /* Keep the optimistic UI state; the next user edit can retry persistence. */ });
+    }, 300);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, [mapSettings, mapSettingsReady]);
 
   const updateMapSettings = (change: Partial<MapSettings>) => {
+    mapSettingsDirtyRef.current = true;
     setMapSettings((current) => ({ ...current, ...change }));
     if (change.signalPanelEnabled !== undefined) {
       setSignalQueueOpen(change.signalPanelEnabled);
@@ -810,7 +826,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     setSelectedSignal(null);
     setSelectedAircraft(null);
     setSelectedIntelPoint(null);
-    setGraphEntity(entity);
+    onOpenGraph?.(entity);
   };
 
   const openSignal = (signal: Signal) => {
@@ -1098,8 +1114,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     </div>}
     {snapshot.fetchedAt && <LayerRail activeLayers={activeSpikeDomains} loadingLayers={loadingLayers} detailState={detailState} layersData={layers} snapshot={snapshot} selectedLayer={selectedLayer} open={layerOpen} onSelect={(domain) => { setSelectedLayer(domain); setLayerOpen(true); }} onToggleLayer={() => undefined} onToggleAll={toggleAllLayers} onToggleDetail={toggleDetail} onClose={() => setLayerOpen(false)} />}
     {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && !selectedSignal && <div className="maplibre-spike-signal-queue"><IncomingSignalQueue signals={signals} status={statusText} onOpenSignal={openSignal} onOpenEntity={focusEntity} onViewAll={onOpenSignalsWorkspace} /></div>}
-    {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && selectedSignal && <div ref={signalPanelRef} className={`spike-signal-node-sheet${signalPanelDragging ? " is-dragging" : ""}`} style={{ "--signal-drag-x": `${signalPanelOffset.x}px`, "--signal-drag-y": `${signalPanelOffset.y}px` } as CSSProperties} onPointerDown={handleSignalPanelDragStart} data-dragging={signalPanelDragging ? "true" : undefined}><MapNodeSheet entity={signalNode(selectedSignal)} onClose={() => setSelectedSignal(null)} onAgent={() => attachSignalToAgent(selectedSignal)} facts={[]} observedLabel={selectedSignal.observedAt ? `${selectedSignal.observedAt.slice(11, 19)}Z` : "—"} media={selectedSignal.imageUrl ? { kind: "jpg", url: selectedSignal.imageUrl } : undefined} showDetail showMediaSourcePicker={false} sourceActionLabel="VIEW REPORT" /></div>}
-    {snapshot.fetchedAt && graphEntity && <NodeGraphSheet entity={graphEntity} observations={snapshot.observations} onClose={() => setGraphEntity(null)} />}
+    {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && selectedSignal && <div ref={signalPanelRef} className={`spike-signal-node-sheet${signalPanelDragging ? " is-dragging" : ""}`} style={{ "--signal-drag-x": `${signalPanelOffset.x}px`, "--signal-drag-y": `${signalPanelOffset.y}px` } as CSSProperties} onPointerDown={handleSignalPanelDragStart} data-dragging={signalPanelDragging ? "true" : undefined}><MapNodeSheet entity={signalNode(selectedSignal)} onClose={() => setSelectedSignal(null)} onAgent={() => attachSignalToAgent(selectedSignal)} onGraph={openNodeGraph} facts={[]} observedLabel={selectedSignal.observedAt ? `${selectedSignal.observedAt.slice(11, 19)}Z` : "—"} media={selectedSignal.imageUrl ? { kind: "jpg", url: selectedSignal.imageUrl } : undefined} showDetail showMediaSourcePicker={false} sourceActionLabel="VIEW REPORT" /></div>}
     {snapshot.fetchedAt && <MapHud className="map-facts" facts={[
       { label: "ZOOM", value: hud.zoom.toFixed(1) },
       { label: "LOCATION", value: locationName, tone: "green" },
