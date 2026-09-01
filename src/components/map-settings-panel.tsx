@@ -12,12 +12,12 @@ type MapSettingsPanelProps = {
 };
 
 export function MapSettingsPanel({ settings, onChange, onClose }: MapSettingsPanelProps) {
-  return <aside className="spike-settings-overlay" aria-label="Map settings">
+  return <aside className="map-settings-overlay" aria-label="Map settings">
     <header className="map-settings-head">
       <div>
         <strong>Settings</strong>
       </div>
-      <button type="button" className="spike-actions-close" onClick={onClose} aria-label="Close settings"><X size={15} /></button>
+      <button type="button" className="map-actions-close" onClick={onClose} aria-label="Close settings"><X size={15} /></button>
     </header>
     <div className="map-settings-body">
       <label className="map-settings-field" htmlFor="map-time-zone">

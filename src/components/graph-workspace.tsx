@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowClockwise, CircleNotch, MagnifyingGlass, ShareNetwork, X } from "@phosphor-icons/react";
 import { NodeRelationshipGraph } from "@/src/components/node-relationship-graph";
-import type { WorkspaceSearchCorpus } from "@/src/components/maplibre-react-spike";
+import type { WorkspaceSearchCorpus } from "@/src/components/map-workspace";
 import type { GraphLink, GraphNode } from "@/src/lib/intelligence";
 import type { NodeGraph, NodeGraphExpansion } from "@/src/lib/node-graph";
 import type { InspectorRef } from "@/src/lib/workspace-shell-state";
@@ -124,7 +124,7 @@ export function GraphWorkspace({ corpus, focusId, focusToken, expandId, onInspec
     if (record) {
       onInspect({ kind: node.id.startsWith("signal:") ? "signal" : "entity", id: record.id, sourceLens: "graph" });
     } else {
-      onInspect({ kind: "node", id: node.id, sourceLens: "graph", title: node.label, body: node.detail ?? `${node.type} node` });
+      onInspect({ kind: "node", id: node.id, sourceLens: "graph", title: node.label, body: node.detail ?? "No additional detail available.", nodeType: node.type, nodeSource: node.source });
     }
   };
 
@@ -135,8 +135,9 @@ export function GraphWorkspace({ corpus, focusId, focusToken, expandId, onInspec
   }, [expandId, graph]);
 
   function selectedRecordFor(node: GraphNode) {
-    if (node.id.startsWith("signal:")) return corpus.signals.find((item) => item.id === graphNodeId(node.id));
-    return corpus.entities.find((item) => item.id === node.id);
+    const records = node.id.startsWith("signal:") ? corpus.signals : corpus.entities;
+    const id = graphNodeId(node.id);
+    return records.find((item) => item.id === id) ?? records.find((item) => item.name === node.label || item.name.startsWith(node.label));
   }
 
   return <section className="workspace-foundation graph-workspace" aria-labelledby="workspace-graph-title">

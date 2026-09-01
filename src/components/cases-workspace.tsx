@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ArrowLeft, CaretRight, Check, FolderOpen, MagnifyingGlass, MapTrifold, Plus, ShareNetwork, Star, X } from "@phosphor-icons/react";
 import type { CaseEvent, CaseItem, CaseNote, CaseStatus, CreateCaseInput, IntelligenceCase } from "@/src/lib/cases";
 import type { BriefDevelopment } from "@/src/lib/brief";
-import type { WorkspaceSearchCorpus, WorkspaceSearchSelection } from "@/src/components/maplibre-react-spike";
+import type { WorkspaceSearchCorpus, WorkspaceSearchSelection } from "@/src/components/map-workspace";
 import { WorkspaceSelect } from "@/src/components/workspace-controls";
 import type { InspectorRef, WorkspaceLens } from "@/src/lib/workspace-shell-state";
 

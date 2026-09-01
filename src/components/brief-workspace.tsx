@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowClockwise, ArrowSquareOut, CaretDown, CaretRight, ChatCircleText, ClockCounterClockwise, DownloadSimple, FloppyDisk, FolderOpen, MapTrifold, PencilSimple, ShareNetwork, X } from "@phosphor-icons/react";
 import { defaultBriefScope, type BriefDevelopment, type BriefRange, type BriefScope } from "@/src/lib/brief";
 import type { OverviewArtifact } from "@/src/lib/server/overview-store";
-import type { WorkspaceSearchCorpus, WorkspaceSearchSelection } from "@/src/components/maplibre-react-spike";
+import type { WorkspaceSearchCorpus, WorkspaceSearchSelection } from "@/src/components/map-workspace";
 import type { InspectorRef, WorkspaceLens } from "@/src/lib/workspace-shell-state";
 import { WorkspaceMultiMenu } from "@/src/components/workspace-controls";
 

@@ -1,4 +1,4 @@
--- System-wide map display settings for the current no-auth spike.
+-- System-wide map display settings for the current no-auth workspace.
 create table if not exists public.map_settings (
   scope text primary key,
   settings jsonb not null default '{}'::jsonb,

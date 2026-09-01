@@ -2,7 +2,7 @@ export const workspaceLenses = ["signals", "brief", "cases", "entities", "graph"
 
 export type WorkspaceLens = (typeof workspaceLenses)[number];
 export type InspectorKind = "signal" | "entity" | "case" | "evidence" | "node" | "note";
-export type InspectorRef = { kind: InspectorKind; id: string; sourceLens: WorkspaceLens; title?: string; body?: string; updatedAt?: string };
+export type InspectorRef = { kind: InspectorKind; id: string; sourceLens: WorkspaceLens; title?: string; body?: string; updatedAt?: string; nodeType?: string; nodeSource?: string };
 export type InspectorState = { content: InspectorRef; presentation: "overlay" | "split" };
 
 export type WorkspaceShellState = {

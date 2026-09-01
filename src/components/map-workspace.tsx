@@ -43,7 +43,7 @@ type IntelPointRenderNode = {
   color: [number, number, number];
   entity: Entity;
 };
-type SpikeHudState = { zoom: number; center: [number, number]; cursor: [number, number] | null; scaleKm: number };
+type MapHudState = { zoom: number; center: [number, number]; cursor: [number, number] | null; scaleKm: number };
 type SignalPanelDragState = { startX: number; startY: number; baseX: number; baseY: number; minX: number; maxX: number; minY: number; maxY: number };
 export type WorkspaceSearchSelection = (
   | { kind: "place"; value: GeosearchResult }
@@ -64,9 +64,9 @@ type ShippingLaneCollection = {
   }>;
 };
 
-const spikeDomains = layers.map((layer) => layer.id);
+const mapDomains = layers.map((layer) => layer.id);
 const providerRoutes = getCatalog().providers.map((provider) => ({ providerId: provider.id, domain: provider.domain, url: `/api/providers/${encodeURIComponent(provider.id)}` }));
-const defaultDetailState: Record<string, string[]> = Object.fromEntries(layers.map((layer) => [layer.id, defaultLayerIds.includes(layer.id) && spikeDomains.includes(layer.id) ? ["all"] : []]));
+const defaultDetailState: Record<string, string[]> = Object.fromEntries(layers.map((layer) => [layer.id, defaultLayerIds.includes(layer.id) && mapDomains.includes(layer.id) ? ["all"] : []]));
 const satelliteTiles = "/api/tiles/satellite/{z}/{x}/{y}";
 const darkStyle: StyleSpecification = {
   version: 8,
@@ -564,7 +564,7 @@ function isEntityEnabled(entity: Entity, detailState: Partial<Record<Domain, str
     return selected.some((detailId) => (layerDetails[entity.domain] ?? []).find((detail) => detail.id === detailId)?.match(entity));
 }
 
-type MaplibreReactSpikeProps = {
+type MapWorkspaceProps = {
   onFeedStatusChange?: (status: FeedStatus) => void;
   onSearchCorpusChange?: (corpus: WorkspaceSearchCorpus) => void;
   onMapSettingsStateChange?: (state: WorkspaceMapSettingsState) => void;
@@ -576,7 +576,7 @@ type MaplibreReactSpikeProps = {
   workspaceToolRequest?: WorkspaceToolRequest | null;
 };
 
-export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onMapSettingsStateChange, onOpenSignalsWorkspace, onOpenGraph, onSearchCorpusChange, onWorkspaceToolStateChange, searchSelection, workspaceToolRequest }: MaplibreReactSpikeProps = {}) {
+export function MapWorkspace({ mapSettingsRequest, onFeedStatusChange, onMapSettingsStateChange, onOpenSignalsWorkspace, onOpenGraph, onSearchCorpusChange, onWorkspaceToolStateChange, searchSelection, workspaceToolRequest }: MapWorkspaceProps = {}) {
   const [snapshot, setSnapshot] = useState<IntelligenceSnapshot>(emptySnapshot);
   const [error, setError] = useState<string | null>(null);
   const [projectionMode, setProjectionMode] = useState<"globe" | "flat">("globe");
@@ -605,7 +605,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
   const [agentReferences, setAgentReferences] = useState<ChatReference[]>([]);
   const [deterministicAction, setDeterministicAction] = useState<DeterministicAction | null>(null);
   const [workspaceToolAnchorX, setWorkspaceToolAnchorX] = useState(0);
-  const [hud, setHud] = useState<SpikeHudState>({ zoom: 4, center: [18, 34], cursor: null, scaleKm: 0 });
+  const [hud, setHud] = useState<MapHudState>({ zoom: 4, center: [18, 34], cursor: null, scaleKm: 0 });
   const [providerRequest, setProviderRequest] = useState<ProviderRequest | null>(null);
   const mapRef = useRef<MapRef>(null);
   const signalPanelRef = useRef<HTMLDivElement>(null);
@@ -701,7 +701,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapSettingsRequest?.token]);
   const displayedEntities = entities;
-  const activeSpikeDomains = useMemo(() => spikeDomains.filter((domain) => (detailState[domain] ?? []).length > 0), [detailState]);
+  const activeMapDomains = useMemo(() => mapDomains.filter((domain) => (detailState[domain] ?? []).length > 0), [detailState]);
   // Lanes are a static navigational reference, not a live maritime provider result.
   // Keep them on while vessel/port entities retain their opt-in default.
   const shippingLanesVisible = true;
@@ -713,7 +713,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     ? maritimePortNodes.filter((port) => isOnFrontGlobeHemisphere(hud.center, [port.location.coordinates.lng, port.location.coordinates.lat]))
     : maritimePortNodes, [hud.center, maritimePortNodes, projectionMode]);
   const intelPointNodes = useMemo(() => toIntelPointNodes(displayedEntities.filter((entity) => isEntityEnabled(entity, detailState))), [detailState, displayedEntities]);
-  const loadingLayers = activeSpikeDomains.filter((domain) => !snapshot.snapshots.some((item) => item.domain === domain));
+  const loadingLayers = activeMapDomains.filter((domain) => !snapshot.snapshots.some((item) => item.domain === domain));
   const statusText = getFeedStatus(snapshot, { loading: !snapshot.fetchedAt, error });
   useEffect(() => {
     onFeedStatusChange?.(statusText);
@@ -786,8 +786,8 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
 
   const toggleAllLayers = () => {
     setDetailState((current) => {
-      const allActive = spikeDomains.every((domain) => (current[domain] ?? []).length > 0);
-      return Object.fromEntries(spikeDomains.map((domain) => [domain, allActive ? [] : ["all"]]));
+      const allActive = mapDomains.every((domain) => (current[domain] ?? []).length > 0);
+      return Object.fromEntries(mapDomains.map((domain) => [domain, allActive ? [] : ["all"]]));
     });
   };
 
@@ -930,10 +930,10 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     const controller = new AbortController();
     let settledProviders = 0;
     let successfulProviders = 0;
-    const activeProviders = providerRoutes.filter((provider) => activeSpikeDomains.includes(provider.domain));
+    const activeProviders = providerRoutes.filter((provider) => activeMapDomains.includes(provider.domain));
     const providerCount = activeProviders.length;
     setSnapshot((current) => {
-      const snapshots = current.snapshots.filter((item) => activeSpikeDomains.includes(item.domain));
+      const snapshots = current.snapshots.filter((item) => activeMapDomains.includes(item.domain));
       return { ...current, viewport, snapshots, observations: snapshots.flatMap((item) => item.observations) };
     });
     if (!providerCount) return () => controller.abort();
@@ -974,7 +974,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
       cancelled = true;
       controller.abort();
     };
-  }, [activeSpikeDomains, providerRequest]);
+  }, [activeMapDomains, providerRequest]);
 
   useEffect(() => {
     aircraftNodesRef.current = aircraftNodes;
@@ -993,7 +993,7 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
     }
   }, [shippingLanesVisible]);
 
-  return <main className="maplibre-react-spike" style={{ "--workspace-tool-anchor-x": `${workspaceToolAnchorX}px` } as CSSProperties}>
+  return <main className="map-workspace" style={{ "--workspace-tool-anchor-x": `${workspaceToolAnchorX}px` } as CSSProperties}>
     <Map
       key={baseMode}
       ref={mapRef}
@@ -1112,9 +1112,9 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
       {cartoEnabled && <button type="button" className={baseMode === "carto" ? "active" : ""} onClick={() => setBase("carto")} aria-pressed={baseMode === "carto"} aria-label="Carto dark map base">CARTO</button>}
       <button type="button" className={baseMode === "satellite" ? "active" : ""} onClick={() => setBase("satellite")} aria-pressed={baseMode === "satellite"} aria-label="Satellite imagery base">SAT</button>
     </div>}
-    {snapshot.fetchedAt && <LayerRail activeLayers={activeSpikeDomains} loadingLayers={loadingLayers} detailState={detailState} layersData={layers} snapshot={snapshot} selectedLayer={selectedLayer} open={layerOpen} onSelect={(domain) => { setSelectedLayer(domain); setLayerOpen(true); }} onToggleLayer={() => undefined} onToggleAll={toggleAllLayers} onToggleDetail={toggleDetail} onClose={() => setLayerOpen(false)} />}
-    {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && !selectedSignal && <div className="maplibre-spike-signal-queue"><IncomingSignalQueue signals={signals} status={statusText} onOpenSignal={openSignal} onOpenEntity={focusEntity} onViewAll={onOpenSignalsWorkspace} /></div>}
-    {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && selectedSignal && <div ref={signalPanelRef} className={`spike-signal-node-sheet${signalPanelDragging ? " is-dragging" : ""}`} style={{ "--signal-drag-x": `${signalPanelOffset.x}px`, "--signal-drag-y": `${signalPanelOffset.y}px` } as CSSProperties} onPointerDown={handleSignalPanelDragStart} data-dragging={signalPanelDragging ? "true" : undefined}><MapNodeSheet entity={signalNode(selectedSignal)} onClose={() => setSelectedSignal(null)} onAgent={() => attachSignalToAgent(selectedSignal)} onGraph={openNodeGraph} facts={[]} observedLabel={selectedSignal.observedAt ? `${selectedSignal.observedAt.slice(11, 19)}Z` : "—"} media={selectedSignal.imageUrl ? { kind: "jpg", url: selectedSignal.imageUrl } : undefined} showDetail showMediaSourcePicker={false} sourceActionLabel="VIEW REPORT" /></div>}
+    {snapshot.fetchedAt && <LayerRail activeLayers={activeMapDomains} loadingLayers={loadingLayers} detailState={detailState} layersData={layers} snapshot={snapshot} selectedLayer={selectedLayer} open={layerOpen} onSelect={(domain) => { setSelectedLayer(domain); setLayerOpen(true); }} onToggleLayer={() => undefined} onToggleAll={toggleAllLayers} onToggleDetail={toggleDetail} onClose={() => setLayerOpen(false)} />}
+    {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && !selectedSignal && <div className="map-signal-queue"><IncomingSignalQueue signals={signals} status={statusText} onOpenSignal={openSignal} onOpenEntity={focusEntity} onViewAll={onOpenSignalsWorkspace} /></div>}
+    {snapshot.fetchedAt && mapSettingsReady && mapSettings.signalPanelEnabled && selectedSignal && <div ref={signalPanelRef} className={`map-signal-node-sheet${signalPanelDragging ? " is-dragging" : ""}`} style={{ "--signal-drag-x": `${signalPanelOffset.x}px`, "--signal-drag-y": `${signalPanelOffset.y}px` } as CSSProperties} onPointerDown={handleSignalPanelDragStart} data-dragging={signalPanelDragging ? "true" : undefined}><MapNodeSheet entity={signalNode(selectedSignal)} onClose={() => setSelectedSignal(null)} onAgent={() => attachSignalToAgent(selectedSignal)} onGraph={openNodeGraph} facts={[]} observedLabel={selectedSignal.observedAt ? `${selectedSignal.observedAt.slice(11, 19)}Z` : "—"} media={selectedSignal.imageUrl ? { kind: "jpg", url: selectedSignal.imageUrl } : undefined} showDetail showMediaSourcePicker={false} sourceActionLabel="VIEW REPORT" /></div>}
     {snapshot.fetchedAt && <MapHud className="map-facts" facts={[
       { label: "ZOOM", value: hud.zoom.toFixed(1) },
       { label: "LOCATION", value: locationName, tone: "green" },
@@ -1122,10 +1122,10 @@ export function MaplibreReactSpike({ mapSettingsRequest, onFeedStatusChange, onM
       { label: "CURSOR LON LAT", value: hud.cursor ? `${formatCoordinate(hud.cursor[1], "N", "S")} ${formatCoordinate(hud.cursor[0], "E", "W")}` : "—" },
     ]} />}
     {typeof document !== "undefined" && snapshot.fetchedAt && createPortal(<div className="workspace-tool-layer" style={{ "--workspace-tool-anchor-x": `${workspaceToolAnchorX}px` } as CSSProperties}>
-      {utilityTool === "actions" && !agentCommand && !deterministicAction && <aside className="spike-actions-overlay" aria-label="Actions"><button type="button" className="spike-actions-close" onClick={() => setUtilityTool("home")} aria-label="Close actions"><X size={15} /></button><ActionDeck onAction={(action) => { setDeterministicAction(action); setUtilityTool("home"); }} onAgent={() => setAgentCommand("Triage the highest risk incoming signals now")} onOverview={() => { setAgentCommand("Open the current map overview"); setUtilityTool("home"); }} /></aside>}
+      {utilityTool === "actions" && !agentCommand && !deterministicAction && <aside className="map-actions-overlay" aria-label="Actions"><button type="button" className="map-actions-close" onClick={() => setUtilityTool("home")} aria-label="Close actions"><X size={15} /></button><ActionDeck onAction={(action) => { setDeterministicAction(action); setUtilityTool("home"); }} onAgent={() => setAgentCommand("Triage the highest risk incoming signals now")} onOverview={() => { setAgentCommand("Open the current map overview"); setUtilityTool("home"); }} /></aside>}
       {deterministicAction && <DeterministicActionSheet variant="map" action={deterministicAction} onClose={() => { setDeterministicAction(null); setUtilityTool("home"); }} />}
       {agentCommand && <AgentSheet variant="map" initialCommand={agentCommand} entityIds={entities.slice(0, 20).map((entity) => entity.id)} references={agentReferences} onRemoveReference={(referenceId) => setAgentReferences((current) => current.filter((reference) => reference.id !== referenceId))} onFocusReference={focusAgentReference} context={{ fetchedAt: snapshot.fetchedAt, viewport: snapshot.viewport, observations: snapshot.observations, sourceStatuses: snapshot.snapshots.map((item) => ({ sourceId: item.source.id, status: item.status, error: item.error })) }} onClose={() => { setAgentCommand(null); setUtilityTool("home"); }} />}
     </div>, document.body)}
-    {!snapshot.fetchedAt && <div className="maplibre-react-spike-loader">{error ?? "LOADING..."}</div>}
+    {!snapshot.fetchedAt && <div className="map-workspace-loader">{error ?? "LOADING..."}</div>}
   </main>;
 }
