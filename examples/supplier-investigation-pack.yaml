@@ -1,0 +1,42 @@
+domain: supply-chain
+version: 1.0.0
+label: Supplier investigations
+subdomains:
+  - id: suppliers
+    label: Suppliers and organizations
+providers:
+  - id: supplier-registry
+    label: Supplier registry
+    sourceId: supplier-registry
+    type: http-json
+    endpoint: https://supplier-system.example/api/organizations
+    mapping:
+      itemsPath: organizations
+      signalType: supply-chain.organization
+      signal:
+        id: { path: id }
+        name: { path: legalName }
+        description: { path: summary }
+        observedAt: { path: updatedAt }
+        riskScore: { path: riskScore }
+        properties:
+          registrationNumber: { path: registrationNumber }
+          country: { path: country }
+          parentOrganizationId: { path: parentOrganizationId }
+          supplierTier: { path: supplierTier }
+signals:
+  - id: supply-chain.organization
+    label: Supplier organization
+    providerId: supplier-registry
+    subdomainId: suppliers
+presentation:
+  map:
+    id: supply-chain
+    label: Supplier investigations
+    short: SUP
+    color: '#ffffff'
+    source: Supplier registry
+    status: live
+    details:
+      - id: organizations
+        label: Supplier organizations
