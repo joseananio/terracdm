@@ -7,6 +7,13 @@ packs:
   defaults: enabled
   entries: {}
 
+# Optional Craven ontology bindings. Keep the API token in CRAVEN_API_TOKEN.
+# semanticBackend:
+#   mappings:
+#     supply-chain:
+#       ontologyPackageId: 00000000-0000-4000-8000-000000000000
+#       typeRef: Supplier
+
 # Example:
 #
 # packs:

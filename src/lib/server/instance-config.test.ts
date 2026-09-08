@@ -57,6 +57,16 @@ test("validates the instance selection and provider override shape", () => {
   assert.deepEqual([...selectInstancePackDomains(["aviation", "weather"], assertValidInstanceConfig(input))], ["aviation"]);
 });
 
+test("validates versioned Craven ontology mappings in instance configuration", () => {
+  const input = { version: 1, packs: { defaults: "enabled", entries: {} }, semanticBackend: { mappings: {
+    "supply-chain": { ontologyPackageId: "11111111-1111-4111-8111-111111111111", typeRef: "Supplier" },
+  } } };
+  assert.deepEqual(validateInstanceConfig(input), []);
+  assert.equal(assertValidInstanceConfig(input).semanticBackend?.mappings["supply-chain"].typeRef, "Supplier");
+  assert.ok(validateInstanceConfig({ ...input, semanticBackend: { mappings: { bad: { ontologyPackageId: "nope", typeRef: "" } } } })
+    .some((error) => error.includes("ontologyPackageId must be a UUID")));
+});
+
 test("loads an instance YAML file without exposing environment values", () => {
   const directory = mkdtempSync(join(tmpdir(), "terracdm-instance-"));
   const path = join(directory, "terracdm.yaml");

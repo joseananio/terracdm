@@ -8,7 +8,8 @@ Configure server-only environment variables:
 CRAVEN_BASE_URL=https://platform.semogram.com
 CRAVEN_PROJECT_ID=<project UUID>
 CRAVEN_API_TOKEN=<user-bound project API key>
-CRAVEN_ONTOLOGY_MAPPINGS={"supply-chain":{"ontologyPackageId":"<package UUID>","typeRef":"Supplier"}}
 ```
+
+Ontology mappings belong in the validated `semanticBackend.mappings` section of `terracdm.yaml`. This keeps domain semantics reviewable and versioned with the instance configuration rather than hidden in a deployment variable.
 
 Apply `supabase/migrations/20260908202630_add_craven_semantic_links.sql` first. The intelligence API reports `semanticBackend.mode`, synchronization counts, and correction counts. A missing configuration produces `standalone`; remote failures never roll back provider ingestion.

@@ -22,12 +22,17 @@ export type InstancePackEntry = {
   providers?: Record<string, InstanceProviderOverride>;
 };
 
+export type SemanticBackendConfig = {
+  mappings: Record<string, { ontologyPackageId: string; typeRef: string }>;
+};
+
 export type InstanceConfig = {
   version: 1;
   packs: {
     defaults: "enabled" | "disabled";
     entries: Record<string, InstancePackEntry>;
   };
+  semanticBackend?: SemanticBackendConfig;
 };
 
 export type LoadedInstanceConfig = {
@@ -38,12 +43,14 @@ export type LoadedInstanceConfig = {
 const DEFAULT_INSTANCE_CONFIG = "terracdm.yaml";
 const sourceModes = new Set<CatalogSourceMode>(["live", "cached", "key_required", "unavailable"]);
 const coverages = new Set<ProviderCoverage>(["global", "viewport"]);
-const rootKeys = new Set(["version", "packs"]);
+const rootKeys = new Set(["version", "packs", "semanticBackend"]);
 const packKeys = new Set(["defaults", "entries"]);
 const entryKeys = new Set(["enabled", "source", "providers"]);
 const providerKeys = new Set(["enabled", "endpoint", "sourceMode", "note", "auth", "pollSeconds", "cache", "coverage"]);
 const authKeys = new Set(["env", "header", "query"]);
 const cacheKeys = new Set(["maxAgeSeconds", "staleIfErrorSeconds"]);
+const semanticBackendKeys = new Set(["mappings"]);
+const semanticMappingKeys = new Set(["ontologyPackageId", "typeRef"]);
 
 type PlainRecord = Record<string, unknown>;
 
@@ -120,6 +127,20 @@ function validateEntry(value: unknown, path: string, errors: string[]) {
   }
 }
 
+function validateSemanticBackend(value: unknown, errors: string[]) {
+  if (!isPlainRecord(value)) { errors.push("config.semanticBackend must be an object"); return; }
+  rejectUnknownKeys(value, semanticBackendKeys, "config.semanticBackend", errors);
+  if (!isPlainRecord(value.mappings)) { errors.push("config.semanticBackend.mappings must be an object keyed by pack domain"); return; }
+  for (const [domain, mapping] of Object.entries(value.mappings)) {
+    const path = `config.semanticBackend.mappings.${domain}`;
+    if (!isNonEmptyString(domain)) errors.push("config.semanticBackend.mappings contains an empty domain");
+    if (!isPlainRecord(mapping)) { errors.push(`${path} must be an object`); continue; }
+    rejectUnknownKeys(mapping, semanticMappingKeys, path, errors);
+    if (typeof mapping.ontologyPackageId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(mapping.ontologyPackageId)) errors.push(`${path}.ontologyPackageId must be a UUID`);
+    if (!isNonEmptyString(mapping.typeRef)) errors.push(`${path}.typeRef must be a non-empty string`);
+  }
+}
+
 export function validateInstanceConfig(input: unknown): string[] {
   const errors: string[] = [];
   if (!isPlainRecord(input)) return ["instance config must be a plain object"];
@@ -139,19 +160,21 @@ export function validateInstanceConfig(input: unknown): string[] {
       validateEntry(entry, `config.packs.entries.${domain}`, errors);
     }
   }
+  if (input.semanticBackend !== undefined) validateSemanticBackend(input.semanticBackend, errors);
   return [...new Set(errors)];
 }
 
 export function assertValidInstanceConfig(input: unknown): InstanceConfig {
   const errors = validateInstanceConfig(input);
   if (errors.length) throw new Error(`Invalid terracdm instance configuration:\n${errors.join("\n")}`);
-  const value = input as { version: 1; packs?: { defaults?: "enabled" | "disabled"; entries?: Record<string, InstancePackEntry> } };
+  const value = input as { version: 1; packs?: { defaults?: "enabled" | "disabled"; entries?: Record<string, InstancePackEntry> }; semanticBackend?: SemanticBackendConfig };
   return {
     version: 1,
     packs: {
       defaults: value.packs?.defaults ?? "enabled",
       entries: value.packs?.entries ?? {},
     },
+    ...(value.semanticBackend ? { semanticBackend: value.semanticBackend } : {}),
   };
 }
 

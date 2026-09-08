@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import type { Observation } from "../intelligence";
 import { stableMaterialJson } from "./provider-revision";
+import { loadOptionalInstanceConfig } from "./instance-config";
 
 type Mapping = { ontologyPackageId: string; typeRef: string };
 type Reference = { provider: ProviderRef; status: "canonical" | "unresolved" | "redirected"; canonicalId: string | null; canonicalRevision: number | null; decisionId: string | null };
@@ -12,9 +13,9 @@ function config() {
   const baseUrl = process.env.CRAVEN_BASE_URL?.trim();
   const projectId = process.env.CRAVEN_PROJECT_ID?.trim();
   const token = process.env.CRAVEN_API_TOKEN?.trim();
-  const rawMappings = process.env.CRAVEN_ONTOLOGY_MAPPINGS?.trim();
-  if (!baseUrl || !projectId || !token || !rawMappings) return null;
-  return { baseUrl: baseUrl.replace(/\/$/, ""), projectId, token, mappings: JSON.parse(rawMappings) as Record<string, Mapping> };
+  const mappings = loadOptionalInstanceConfig()?.config.semanticBackend?.mappings;
+  if (!baseUrl || !projectId || !token || !mappings) return null;
+  return { baseUrl: baseUrl.replace(/\/$/, ""), projectId, token, mappings: mappings as Record<string, Mapping> };
 }
 
 function database() {
