@@ -18,7 +18,7 @@ test("split widths are bounded", () => {
 
 test("URL state round trips", () => {
   const state = workspaceShellReducer(
-    workspaceShellReducer(defaultWorkspaceShellState, { type: "open-inspector", content: { kind: "entity", id: "entity 1", sourceLens: "entities", returnContext: { lens: "entities", query: "france 24", filter: "located", sort: "risk", scrollTop: 319 } } }),
+    workspaceShellReducer(defaultWorkspaceShellState, { type: "open-inspector", content: { kind: "entity", id: "entity 1", sourceLens: "entities", returnContext: { lens: "entities", query: "france 24", filter: "located", sort: "risk", scrollTop: 319, scopeId: "case-1", tab: "evidence" } } }),
     { type: "pin-inspector" },
   );
   const search = writeWorkspaceLocation(state);

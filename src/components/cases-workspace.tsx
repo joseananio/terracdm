@@ -6,7 +6,7 @@ import type { CaseEvent, CaseItem, CaseNote, CaseStatus, CreateCaseInput, Intell
 import type { BriefDevelopment } from "@/src/lib/brief";
 import type { WorkspaceSearchCorpus, WorkspaceSearchSelection } from "@/src/components/map-workspace";
 import { WorkspaceSelect } from "@/src/components/workspace-controls";
-import type { InspectorRef, WorkspaceLens } from "@/src/lib/workspace-shell-state";
+import type { InspectorRef, WorkspaceLens, WorkspaceSelectionContext } from "@/src/lib/workspace-shell-state";
 
 type CaseTab = "summary" | "timeline" | "evidence" | "relationships" | "notes";
 type CaseHandoff = { briefId?: string; development?: BriefDevelopment; targetCaseId?: string } | { kind: "signal" | "entity"; id: string; targetCaseId?: string };
@@ -19,7 +19,8 @@ export type CasePickerRequest =
 type Props = {
   corpus: WorkspaceSearchCorpus;
   onAddEvidence: (caseId: string) => void;
-  onInspect: (content: InspectorRef) => void;
+  onInspect: (content: InspectorRef, context?: WorkspaceSelectionContext) => void;
+  restoreContext?: WorkspaceSelectionContext;
   onNavigate: (lens: WorkspaceLens) => void;
   onViewMap: (selection: Omit<WorkspaceSearchSelection, "token">) => void;
   handoffToken: number;
@@ -148,7 +149,7 @@ function matchesCaseSearch(query: string, ...values: Array<string | undefined>) 
   return terms.every((term) => text.includes(term));
 }
 
-export function CasesWorkspace({ corpus, handoffToken, onAddEvidence, onInspect, onNavigate, onViewMap, refreshToken }: Props) {
+export function CasesWorkspace({ corpus, handoffToken, onAddEvidence, onInspect, onNavigate, onViewMap, refreshToken, restoreContext }: Props) {
   const [cases, setCases] = useState<IntelligenceCase[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<CaseTab>("summary");
@@ -164,6 +165,15 @@ export function CasesWorkspace({ corpus, handoffToken, onAddEvidence, onInspect,
   const [saving, setSaving] = useState(false);
   const [targetCaseId, setTargetCaseId] = useState<string | null>(null);
   const selected = cases.find((item) => item.id === selectedId) ?? null;
+  useEffect(() => {
+    if (restoreContext?.lens !== "cases" || !restoreContext.scopeId || !cases.length) return;
+    const restoredCase = cases.find((item) => item.id === restoreContext.scopeId);
+    if (restoredCase) {
+      setSelectedId(restoredCase.id);
+      setAssessmentDraft(restoredCase.assessment);
+    }
+    if (restoreContext.tab && ["summary", "timeline", "evidence", "relationships", "notes"].includes(restoreContext.tab)) setTab(restoreContext.tab as CaseTab);
+  }, [cases, restoreContext]);
 
   const refresh = async () => {
     const response = await fetch("/api/cases", { cache: "no-store" });
@@ -266,17 +276,18 @@ export function CasesWorkspace({ corpus, handoffToken, onAddEvidence, onInspect,
   };
 
   const inspectItem = (item: CaseItem) => {
-    if (item.kind === "brief") onInspect({ kind: "evidence", id: item.id, sourceLens: "cases", title: item.name, body: item.description || "No description available." });
-    else onInspect({ kind: item.kind, id: item.objectId, sourceLens: "cases" });
+    const context = selected ? { lens: "cases" as const, scopeId: selected.id, tab } : { lens: "cases" as const };
+    if (item.kind === "brief") onInspect({ kind: "evidence", id: item.id, sourceLens: "cases", title: item.name, body: item.description || "No description available." }, context);
+    else onInspect({ kind: item.kind, id: item.objectId, sourceLens: "cases" }, context);
   };
   const inspectEvent = (event: CaseEvent) => {
     if (!event.objectId || !event.objectKind) return;
     if (event.objectKind === "note") {
       const note = selected?.notes.find((item) => item.id === event.objectId);
-      if (note && selected) onInspect({ kind: "note", id: note.id, sourceLens: "cases", title: selected.title, body: note.body, updatedAt: note.updatedAt });
+      if (note && selected) onInspect({ kind: "note", id: note.id, sourceLens: "cases", title: selected.title, body: note.body, updatedAt: note.updatedAt }, { lens: "cases", scopeId: selected.id, tab });
       return;
     }
-    onInspect({ kind: event.objectKind, id: event.objectId, sourceLens: "cases" });
+    onInspect({ kind: event.objectKind, id: event.objectId, sourceLens: "cases" }, { lens: "cases", scopeId: selected?.id, tab });
   };
   const mapItem = selected?.items.find((item) => item.kind !== "brief" && (item.kind === "signal" ? corpus.signals : corpus.entities).some((record) => record.id === item.objectId));
   const viewCaseOnMap = () => {
@@ -294,7 +305,7 @@ export function CasesWorkspace({ corpus, handoffToken, onAddEvidence, onInspect,
       {tab === "timeline" && <section className="case-section"><CaseTimeline events={selected.events} onInspect={inspectEvent} /></section>}
       {tab === "evidence" && <section className="case-section"><CaseEvidenceList items={selected.items} onInspect={inspectItem} onRoleChange={(item, role) => void setEvidenceRole(item, role)} showHeading={false} /></section>}
       {tab === "relationships" && <section className="case-section case-relationships"><div>{selected.items.map((item, index) => <button key={item.id} onClick={() => inspectItem(item)} style={{ "--case-node-index": index } as CSSProperties}><i className={item.kind} /><b>{item.name}</b><small>{item.kind}</small></button>)}</div><button className="case-open-graph" onClick={() => onNavigate("graph")}><ShareNetwork />Open in Graph</button></section>}
-      {tab === "notes" && <section className="case-section case-notes"><label htmlFor="case-note-draft">Add note</label><div className="case-note-compose"><textarea id="case-note-draft" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Write a note" /><button onClick={() => void addNote()} disabled={!noteDraft.trim()}><Plus />Add note</button></div>{selected.notes.map((note) => <article key={note.id}><button onClick={() => void patchCase(selected, { notes: selected.notes.map((item) => item.id === note.id ? { ...item, pinned: !item.pinned } : item) })} aria-label={note.pinned ? "Unpin note" : "Pin note"}><Star weight={note.pinned ? "fill" : "regular"} /></button><button className="case-note-open" onClick={() => onInspect({ kind: "note", id: note.id, sourceLens: "cases", title: selected.title, body: note.body, updatedAt: note.updatedAt })} aria-label={`Open note from ${selected.title}`}><p>{note.body}</p></button><time>{new Date(note.updatedAt).toLocaleString()}</time></article>)}</section>}
+      {tab === "notes" && <section className="case-section case-notes"><label htmlFor="case-note-draft">Add note</label><div className="case-note-compose"><textarea id="case-note-draft" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Write a note" /><button onClick={() => void addNote()} disabled={!noteDraft.trim()}><Plus />Add note</button></div>{selected.notes.map((note) => <article key={note.id}><button onClick={() => void patchCase(selected, { notes: selected.notes.map((item) => item.id === note.id ? { ...item, pinned: !item.pinned } : item) })} aria-label={note.pinned ? "Unpin note" : "Pin note"}><Star weight={note.pinned ? "fill" : "regular"} /></button><button className="case-note-open" onClick={() => onInspect({ kind: "note", id: note.id, sourceLens: "cases", title: selected.title, body: note.body, updatedAt: note.updatedAt }, { lens: "cases", scopeId: selected.id, tab })} aria-label={`Open note from ${selected.title}`}><p>{note.body}</p></button><time>{new Date(note.updatedAt).toLocaleString()}</time></article>)}</section>}
     </div>
   </section>;
 

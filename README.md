@@ -4,6 +4,12 @@
 
 TerraCDM is a situation room for incoming signals, search, relationship graphs, and operational actions.
 
+## Mission
+
+Build a self-hosted, affordable, open-source OSINT operating system for small corporate-security and geopolitical-risk teams.
+
+Help these teams identify relevant developments, investigate evidence, and form defensible assessments. TerraCDM owns collection and the analyst workspace; the intended architecture keeps it useful standalone while supporting Craven or another compatible semantic backend without rebuilding that backend inside TerraCDM.
+
 ## Run locally
 
 HTTPS is required for local development. Use the HTTPS development server so browser APIs, media sources, and map interactions run in the same secure context as production.

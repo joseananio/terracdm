@@ -1,3 +1,13 @@
+# Project mission
+
+Build TerraCDM (Crystalball / CB) as a self-hosted, affordable, open-source OSINT operating system for small corporate-security and geopolitical-risk teams.
+
+- Prioritize helping these teams identify relevant developments, investigate evidence, and form defensible assessments over adding more feeds or screens for their own sake.
+- CB owns provider ingestion, observations, domain mappings, analyst interactions, and presentation. Keep it useful standalone without a semantic backend.
+- Craven is an optional semantic and workflow backend, not another provider. Support it through a backend-neutral contract that other implementations can also satisfy.
+- Do not recreate Craven's canonical entity registry, ontology engine, prediction runtime, or platform identity system inside CB. Local observations, provider-local references, UI projections, cases, and analyst state are legitimate CB responsibilities.
+- Treat this as product direction, not a claim that all capabilities or the Craven integration are already implemented.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
